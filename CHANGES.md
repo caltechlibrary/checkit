@@ -1,9 +1,7 @@
 Change log for REPOSITORY
 =========================
 
-Version 1.0.0
--------------
+Version 0.1
+-----------
 
-* Added a feature
-* Fixed a bug
-* Made another change
+* Work in progress.
