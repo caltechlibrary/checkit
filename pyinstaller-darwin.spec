@@ -54,7 +54,7 @@ executable         = EXE(application_pyz,
                         )
 
 app             = BUNDLE(executable,
-                         name = 'Checkit.app',
+                         name = 'CheckIt.app',
                          icon = 'dev/icons/generated-icons/checkit-icon-512px.icns',
                          bundle_identifier = None,
                          info_plist = {'NSHighResolutionCapable': 'True',
