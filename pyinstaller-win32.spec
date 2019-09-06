@@ -4,7 +4,7 @@
 # @brief   Spec file for PyInstaller for Windows
 # @author  Michael Hucka
 # @license Please see the file named LICENSE in the project directory
-# @website https://github.com/caltechlibrary/describeit
+# @website https://github.com/caltechlibrary/checkit
 # =============================================================================
 
 import imp
@@ -12,11 +12,11 @@ import os
 import sys
 
 # The list must contain tuples: ('file', 'destination directory').
-data_files = [ ('describeit\describeit.ini', 'describeit'),
-               ('describeit\data\client_secrets.json', 'describeit\data'),
-               ('describeit\data\help.html', 'describeit\data') ]
+data_files = [ ('checkit\checkit.ini', 'checkit'),
+               ('checkit\data\client_secrets.json', 'checkit\data'),
+               ('checkit\data\help.html', 'checkit\data') ]
 
-configuration = Analysis([r'describeit\__main__.py'],
+configuration = Analysis([r'checkit\__main__.py'],
                          pathex = ['.'],
                          binaries = [],
                          datas = data_files,
@@ -41,8 +41,8 @@ executable         = EXE(application_pyz,
                          configuration.binaries,
                          configuration.zipfiles,
                          configuration.datas,
-                         name = 'DescribeIt',
-                         icon = r'dev\icons\generated-icons\describeit-icon-512px.ico',
+                         name = 'Checkit',
+                         icon = r'dev\icons\generated-icons\checkit-icon-512px.ico',
                          debug = False,
                          strip = False,
                          upx = True,
@@ -51,8 +51,8 @@ executable         = EXE(application_pyz,
                         )
 
 app             = BUNDLE(executable,
-                         name = 'DescribeIt.exe',
-                         icon = r'dev\icons\generated-icons\describeit-icon-512px.ico',
+                         name = 'Checkit.exe',
+                         icon = r'dev\icons\generated-icons\checkit-icon-512px.ico',
                          bundle_identifier = None,
                          info_plist = {'NSHighResolutionCapable': 'True'},
                         )

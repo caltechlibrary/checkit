@@ -1,5 +1,5 @@
 '''
-Describe It! -- A program to help Caltech Librarians do inventory
+Check It! -- A program to help Caltech Librarians do inventory
 
 Authors
 -------

@@ -4,7 +4,7 @@
 # @brief   Spec file for PyInstaller for macOS
 # @author  Michael Hucka
 # @license Please see the file named LICENSE in the project directory
-# @website https://github.com/caltechlibrary/describeit
+# @website https://github.com/caltechlibrary/checkit
 # =============================================================================
 
 import imp
@@ -12,11 +12,11 @@ import os
 import sys
 
 # The list must contain tuples: ('file', 'destination directory').
-data_files = [ ('describeit/describeit.ini', 'describeit'),
-               ('describeit/data/client_secrets.json', 'describeit/data'),
-               ('describeit/data/help.html', 'describeit/data') ]
+data_files = [ ('checkit/checkit.ini', 'checkit'),
+               ('checkit/data/client_secrets.json', 'checkit/data'),
+               ('checkit/data/help.html', 'checkit/data') ]
 
-configuration = Analysis(['describeit/__main__.py'],
+configuration = Analysis(['checkit/__main__.py'],
                          pathex = ['.'],
                          binaries = [],
                          datas = data_files,
@@ -27,7 +27,7 @@ configuration = Analysis(['describeit/__main__.py'],
                          runtime_hooks = [],
                          # For reasons I can't figure out, PyInstaller tries
                          # to load these even though they're never imported
-                         # by the Describeit code.  Have to exclude them manually.
+                         # by the Checkit code.  Have to exclude them manually.
                          excludes = ['PyQt4', 'PyQt5', 'gtk', 'matplotlib',
                                      'numpy'],
                          win_no_prefer_redirects = False,
@@ -45,7 +45,7 @@ executable         = EXE(application_pyz,
                          configuration.binaries,
                          configuration.zipfiles,
                          configuration.datas,
-                         name = 'describeit',
+                         name = 'checkit',
                          debug = False,
                          strip = False,
                          upx = True,
@@ -54,8 +54,8 @@ executable         = EXE(application_pyz,
                         )
 
 app             = BUNDLE(executable,
-                         name = 'DescribeIt.app',
-                         icon = 'dev/icons/generated-icons/describeit-icon-512px.icns',
+                         name = 'Checkit.app',
+                         icon = 'dev/icons/generated-icons/checkit-icon-512px.icns',
                          bundle_identifier = None,
                          info_plist = {'NSHighResolutionCapable': 'True',
                                        'NSAppleScriptEnabled': False},

@@ -4,7 +4,7 @@ REM @file    make.bat
 REM @brief   Build a .exe using PyInstaller
 REM @author  Michael Hucka <mhucka@caltech.edu>
 REM @license Please see the file named LICENSE in the project directory
-REM @website https://github.com/caltechlibrary/describeit
+REM @website https://github.com/caltechlibrary/checkit
 REM
 REM Usage:
 REM   1. start a terminal shell (e.g., cmd.exe)

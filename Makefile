@@ -1,16 +1,16 @@
 # =============================================================================
 # @file    Makefile
-# @brief   Makefile for some steps in creating a Describe It! application
+# @brief   Makefile for some steps in creating a Check It! application
 # @author  Michael Hucka
 # @date    2019-09-05
 # @license Please see the file named LICENSE in the project directory
-# @website https://github.com/caltechlibrary/describeit
+# @website https://github.com/caltechlibrary/checkit
 # =============================================================================
 
 # Application-specific configuration ------------------------------------------
 
-python_name := describeit
-app_name    := Describeit
+python_name := checkit
+app_name    := CheckIt
 
 # Other variables (should not need changing) ----------------------------------
 

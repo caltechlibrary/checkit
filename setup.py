@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # =============================================================================
 # @file    setup.py
-# @brief   Describe It! setup file
+# @brief   Check It! setup file
 # @author  Michael Hucka <mhucka@caltech.edu>
 # @license Please see the file named LICENSE in the project directory
-# @website https://github.com/caltechlibrary/describeit
+# @website https://github.com/caltechlibrary/checkit
 # =============================================================================
 
 import os
@@ -29,7 +29,7 @@ with open(path.join(SETUP_DIR, 'README.md'), 'r', errors = 'ignore') as f:
 # using setup() in the first place.  This code also avoids eval, for security.
 
 version = {}
-with open(path.join(here, 'describeit/__version__.py')) as f:
+with open(path.join(here, 'checkit/__version__.py')) as f:
     text = f.read().rstrip().splitlines()
     vars = [line for line in text if line.startswith('__') and '=' in line]
     for v in vars:
@@ -60,10 +60,10 @@ setup(
           'Tracker': version['__source_url__'] + '/issues',
       },
     packages         = [package_name],
-    scripts          = ['bin/describeit'],
-    package_data     = {'describeit': ['describeit/describeit.ini',
-                                   'describeit/data/default_template.docx',
-                                   'describeit/data/client_secrets.json']},
+    scripts          = ['bin/checkit'],
+    package_data     = {'checkit': ['checkit/checkit.ini',
+                                   'checkit/data/default_template.docx',
+                                   'checkit/data/client_secrets.json']},
 
     include_package_data = True,
     install_requires = reqs,

@@ -1,7 +1,7 @@
-Describe It!<img width="14%" align="right" src=".graphics/describeit-icon.svg">
+Check It!<img width="14%" align="right" src=".graphics/checkit-icon.svg">
 =========
 
-_Describe It!_ is a program to help Caltech Librarians perform inventory.  It takes a list of bar codes and generates a CSV file containing information about the items drawn from Caltech's TIND server.
+_Check It!_ is a program to help Caltech Librarians perform inventory.  It takes a list of bar codes and generates a CSV file containing information about the items drawn from Caltech's TIND server.
 
 [![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg?style=flat-square)](https://choosealicense.com/licenses/bsd-3-clause)
 [![Latest release](https://img.shields.io/badge/Latest_release-0.1-b44e88.svg?style=flat-square)](http://shields.io)
@@ -29,13 +29,13 @@ _todo_
 Installation
 ------------
 
-The developers provide an installer program for Caltech Library users.  Please contact the developers to get a copy of the installer program for Windows 7, Windows 10, or macOS 10.12+.  Note also that installation of _Describe It!_ on Windows requires administrator priviledges.
+The developers provide an installer program for Caltech Library users.  Please contact the developers to get a copy of the installer program for Windows 7, Windows 10, or macOS 10.12+.  Note also that installation of _Check It!_ on Windows requires administrator priviledges.
 
 Alternatively, you can also build the program from the source code.
 First, use `git` to clone a copy of the program source tree from the GitHub 
 repository to your local computer disk:
 ```sh
-git clone --recursive https@github.com:caltechlibrary/describeit.git
+git clone --recursive https@github.com:caltechlibrary/checkit.git
 ```
 
 
@@ -54,7 +54,7 @@ None are known at this time.
 Getting help
 ------------
 
-If you find an issue, please submit it in [the GitHub issue tracker](https://github.com/caltechlibrary/describeit/issues) for this repository.
+If you find an issue, please submit it in [the GitHub issue tracker](https://github.com/caltechlibrary/checkit/issues) for this repository.
 
 
 License
