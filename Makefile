@@ -28,6 +28,14 @@ help-file  := $(python_name)/data/help.html
 
 build: | dependencies data-files build-$(platform)
 
+release:;
+	sed -i .bak -e "/version/ s/[0-9].[0-9].[0-9]/$$(<VERSION.txt)/" codemeta.json
+	git add codemeta.json
+	git commit -m"Update version number" codemeta.json
+	git tag -a v$$(<VERSION.txt) -m "Release $$(<VERSION.txt)"
+	git push -v --all
+	git push -v --tags
+
 # Platform-specific instructions ----------------------------------------------
 
 build-darwin: $(about-file) $(help-file) dist/$(app_name).app
