@@ -31,10 +31,10 @@ from checkit.debug import log
 # Constants.
 # .............................................................................
 
-_APP_NAME = 'Checkit'
+_APP_NAME = __package__
 '''The human name of this application for human consumption.'''
 
-_APP_REG_PATH = r'Software\Caltech Library\Checkit\Settings'
+_APP_REG_PATH = r'Software\Caltech Library\{}\Settings'.format(_APP_NAME)
 '''The Windows registry path for this application.'''
 
 
@@ -55,7 +55,8 @@ def module_path():
     '''Returns the absolute path to our module installation directory.'''
     # The path returned by module.__path__ is to the directory containing
     # the __init__.py file.
-    return path.abspath(checkit.__path__[0])
+    this_module = sys.modules[__package__]
+    return path.abspath(this_module.__path__[0])
 
 
 def installation_path():
