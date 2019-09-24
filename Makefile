@@ -14,7 +14,7 @@ app_name    := CheckIt
 
 # Other variables (should not need changing) ----------------------------------
 
-release	   := $(shell egrep 'version.*=' $(python_name)/__version__.py | awk '{print $$3}' | tr -d "'")
+release	   := $(file < VERSION.txt)
 platform   := $(shell python3 -c 'import sys; print(sys.platform)')
 distro	   := $(shell python3 -c 'import platform; print(platform.dist()[0].lower())')
 linux_vers := $(shell python3 -c 'import platform; print(platform.dist()[1].lower())' | cut -f1-2 -d'.')
