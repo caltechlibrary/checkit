@@ -96,14 +96,23 @@ class ProgressIndicatorGUI(ProgressIndicatorBase):
 
     def start(self, message = None):
         if __debug__: log('sending progress_message for start')
-        wx.CallAfter(pub.sendMessage, "progress_message", message = message)
+        try:
+            wx.CallAfter(pub.sendMessage, "progress_message", message = message)
+        except Exception as ex:
+            if __debug__: log('Exception: {}', str(ex))
 
 
     def update(self, message = None, count = None):
         if __debug__: log('sending progress_message for update')
-        wx.CallAfter(pub.sendMessage, "progress_message", message = message)
+        try:
+            wx.CallAfter(pub.sendMessage, "progress_message", message = message)
+        except Exception as ex:
+            if __debug__: log('Exception: {}', str(ex))
 
 
     def stop(self, message = None):
         if __debug__: log('sending progress_message for stop')
-        wx.CallAfter(pub.sendMessage, "progress_message", message = message)
+        try:
+            wx.CallAfter(pub.sendMessage, "progress_message", message = message)
+        except Exception as ex:
+            if __debug__: log('Exception: {}', str(ex))
