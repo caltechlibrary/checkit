@@ -17,12 +17,11 @@ file "LICENSE" for more information.
 import os
 from   os import path
 import shutil
+import string
 import subprocess
 import sys
-import tarfile
 import webbrowser
-import zipfile
-from   zipfile import ZipFile, ZIP_STORED, ZIP_DEFLATED
+import wx
 
 import checkit
 from checkit.debug import log
@@ -93,6 +92,86 @@ def datadir_path():
     return path.join(module_path(), 'data')
 
 
+def files_in_directory(dir, extensions = None):
+    if not path.isdir(dir):
+        return []
+    if not readable(dir):
+        return []
+    files = []
+    for item in os.listdir(dir):
+        full_path = path.join(dir, item)
+        if path.isfile(full_path) and readable(full_path):
+            if extensions and filename_extension(item) in extensions:
+                files.append(full_path)
+    return sorted(files)
+
+
+def filename_basename(file):
+    parts = file.rpartition('.')
+    if len(parts) > 1:
+        return ''.join(parts[:-1]).rstrip('.')
+    else:
+        return file
+
+
+def filename_extension(file):
+    parts = file.rpartition('.')
+    if len(parts) > 1:
+        return parts[-1].lower()
+    else:
+        return ''
+
+
+def alt_extension(filepath, ext):
+    '''Returns the 'filepath' with the extension replaced by 'ext'.  The
+    extension given in 'ext' should NOT have a leading period: that is, it
+    should be "foo", not ".foo".'''
+    return path.splitext(filepath)[0] + '.' + ext
+
+
+def filter_by_extensions(item_list, endings):
+    if not item_list:
+        return []
+    if not endings:
+        return item_list
+    results = item_list
+    for ending in endings:
+        results = list(filter(lambda name: ending not in name.lower(), results))
+    return results
+
+
+# The following originally came from an answer posted by user "domenukk"
+# to Stack Overflow: https://stackoverflow.com/a/54564813/743730
+
+def is_csv(infile):
+    '''Return True if the given file is probably a CSV file.'''
+    try:
+        with open(infile, newline='') as csvfile:
+            start = csvfile.read(4096)
+            # isprintable does not allow newlines, printable does not allow umlauts...
+            if not all([c in string.printable or c.isprintable() for c in start]):
+                return False
+            dialect = csv.Sniffer().sniff(start)
+            return True
+    except csv.Error:
+        # Could not get a csv dialect -> probably not a csv.
+        return False
+
+
+def relative(file):
+    '''Returns a path that is relative to the current directory.  If the
+    relative path would require more than one parent step (i.e., ../../*
+    instead of ../*) then it will return an absolute path instead.  If the
+    argument is actuall a file path, it will return it unchanged.'''
+    if is_url(file):
+        return file
+    candidate = path.relpath(file, os.getcwd())
+    if not candidate.startswith('../..'):
+        return candidate
+    else:
+        return path.realpath(candidate)
+
+
 def rename_existing(file):
     '''Renames 'file' to 'file.bak'.'''
 
@@ -150,6 +229,12 @@ def file_in_use(file):
     return False
 
 
+def copy_file(src, dst):
+    '''Copy a file from "src" to "dst".'''
+    if __debug__: log('copying file {} to {}', src, dst)
+    shutil.copy2(src, dst, follow_symlinks = True)
+
+
 def open_file(file):
     '''Open document with default application in Python.'''
     # Code originally from https://stackoverflow.com/a/435669/743730
@@ -169,58 +254,17 @@ def open_url(url):
     webbrowser.open(url)
 
 
-def make_dir(dir_path):
-    '''Creates directory 'dir_path' (including intermediate directories).'''
-    if path.isdir(dir_path):
-        if __debug__: log('Reusing existing directory {}', dir_path)
-        return
-    else:
-        if __debug__: log('Creating directory {}', dir_path)
-        # If this gets an exception, let it bubble up to caller.
-        os.makedirs(dir_path)
+def file_to_open(text, wildcard = 'Any file (*.*)|*.*'):
+    app = wx.App(False)
+    frame = wx.Frame(None, -1, __package__)
+    fd = wx.FileDialog(frame, text, defaultDir = os.getcwd(), wildcard = wildcard,
+                       style = wx.FD_OPEN | wx.FD_FILE_MUST_EXIST)
+    return None if fd.ShowModal() == wx.ID_CANCEL else fd.GetPath()
 
 
-def create_archive(archive_file, type, source_dir, comment = None):
-    root_dir = path.dirname(path.normpath(source_dir))
-    base_dir = path.basename(source_dir)
-    if type.endswith('zip'):
-        format = ZIP_STORED if type.startswith('uncompress') else ZIP_DEFLATED
-        current_dir = os.getcwd()
-        try:
-            os.chdir(root_dir)
-            with zipfile.ZipFile(archive_file, 'w', format) as zf:
-                for root, dirs, files in os.walk(base_dir):
-                    for file in files:
-                        zf.write(os.path.join(root, file))
-                if comment:
-                    zf.comment = comment.encode()
-        finally:
-            os.chdir(current_dir)
-    else:
-        if type.startswith('uncompress'):
-            shutil.make_archive(source_dir, 'tar', root_dir, base_dir)
-        else:
-            shutil.make_archive(source_dir, 'gztar', root_dir, base_dir)
-
-
-def verify_archive(archive_file, type):
-    '''Check the integrity of an archive and raise an exception if needed.'''
-    if type.endswith('zip'):
-        error = ZipFile(archive_file).testzip()
-        if error:
-            raise CorruptedContent('Failed to verify file "{}"'.format(archive_file))
-    else:
-        # Algorithm originally from https://stackoverflow.com/a/32312857/743730
-        tfile = None
-        try:
-            tfile = tarfile.open(archive_file)
-            for member in tfile.getmembers():
-                content = tfile.extractfile(member.name)
-                if content:
-                    for chunk in iter(lambda: content.read(1024), b''):
-                        pass
-        except Exception as ex:
-            raise CorruptedContent('Failed to verify file "{}"'.format(archive_file))
-        finally:
-            if tfile:
-                tfile.close()
+def file_to_save(text):
+    app = wx.App(False)
+    frame = wx.Frame(None, -1, __package__)
+    fd = wx.FileDialog(frame, text, defaultDir = os.getcwd(),
+                       style = wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT)
+    return None if fd.ShowModal() == wx.ID_CANCEL else fd.GetPath()
