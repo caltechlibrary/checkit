@@ -75,36 +75,40 @@ def main(no_color = False, no_gui = False, input_csv = 'I', no_keyring = False,
 
     try:
         if __debug__: log('initializing handlers')
+        tracer = controller = accessor = notifier = None
         if use_gui:
             controller = ControlGUI('Check It!')
+            tracer     = ProgressIndicatorGUI()
             accessor   = AccessHandlerGUI(user, password)
             notifier   = MessageHandlerGUI()
-            tracer     = ProgressIndicatorGUI()
         else:
             controller = ControlCLI('Check It!')
+            tracer     = ProgressIndicatorCLI(use_color)
             accessor   = AccessHandlerCLI(user, password, use_keyring, reset_keys)
             notifier   = MessageHandlerCLI(use_color)
-            tracer     = ProgressIndicatorCLI(use_color)
 
         if __debug__: log('starting main body thread')
         body = MainBody(infile, outfile, controller, accessor, notifier, tracer, debug)
         #controller.start(body)
-    except (KeyboardInterrupt, UserCancelled) as err:
-        tracer.stop('Quitting.')
-        controller.stop()
-    except ServiceFailure:
-        tracer.stop('Stopping due to a problem connecting to services')
-        controller.stop()
-    except Exception as err:
-        import traceback
-        if debug:
-            tracer.stop('{}\n{}'.format(str(ex), traceback.format_exc()))
+    except (KeyboardInterrupt, UserCancelled) as ex:
+        if __debug__: log('received {}', ex.__name__)
+    except Exception as ex:
+        # If something goes wrong, we may not even have initialize our objects,
+        # so we have to act with an abundance of caution here.
+        from traceback import format_exc
+        msg = 'Exception: {}\n{}'.format(str(ex), format_exc())
+        if __debug__: log(msg)
+        if debug != 'OUT':
+            if tracer:
+                tracer.stop(msg)
             import pdb; pdb.set_trace()
         else:
-            notifier.fatal(__package__ + ' encountered an error',
-                           str(err) + '\n' + traceback.format_exc())
-            tracer.stop('Stopping due to error')
-            controller.stop()
+            if tracer:
+                tracer.stop('Stopping due to error')
+            if notifier:
+                notifier.fatal('Encountered an error', str(err) + '\n' + format_exc())
+            if controller:
+                controller.stop()
     else:
         tracer.stop('Done')
         controller.stop()
