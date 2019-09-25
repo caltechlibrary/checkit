@@ -19,35 +19,26 @@ import os.path as path
 from   pubsub import pub
 from   queue import Queue
 import wx
-import wx.adv
-import textwrap
-import webbrowser
 import sys
 
-import checkit
-from checkit.credentials import password, credentials
-from checkit.credentials import keyring_credentials, save_keyring_credentials
-from checkit.exceptions import *
-from checkit.files import datadir_path, readable
-from checkit.debug import log
+from .credentials import password, credentials
+from .credentials import keyring_credentials, save_keyring_credentials
+from .debug import log
 
 
 # Global constants.
 # .............................................................................
 
-_KEYRING = "org.caltechlibrary.checkit"
-'''
-The name of the keyring used to store Caltech access credentials, if any.
-'''
+_KEYRING = "org.caltechlibrary.".format(__package__)
+'''The name of the keyring used to store Caltech access credentials, if any.'''
 
 
 # Exported classes.
 # .............................................................................
 # The basic principle of writing the classes (like this one) that get used in
 # MainBody is that they should take the information they need, rather than
-# putting the info into the controller object (i.e., CheckitControlGUI or
-# CheckitControlCLI).  This is a matter of separation of concerns and
-# information hiding.
+# putting the info into the controller object (i.e., ControlGUI or
+# ControlCLI).  This is a matter of separation of concerns and info hiding.
 
 class AccessHandlerBase():
     ''''Base class for dealing with user access credentials.'''
