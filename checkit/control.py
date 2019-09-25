@@ -81,6 +81,11 @@ from .logo import getLogoIcon
 class ControlBase():
     '''User interface controller base class.'''
 
+    def __init__(self, name, byline = None):
+        self._name = name
+        self._byline = byline
+
+
     @property
     def is_gui():
         '''Returns True if the GUI version of the interface is being used.'''
@@ -90,9 +95,8 @@ class ControlBase():
 class ControlCLI(ControlBase):
     '''User interface controller in command-line interface mode.'''
 
-    def __init__(self, title):
-        super().__init__()
-        self._title = title
+    def __init__(self, name, byline = None):
+        super().__init__(name, byline)
 
 
     @property
@@ -122,11 +126,10 @@ class ControlCLI(ControlBase):
 class ControlGUI(ControlBase):
     '''User interface controller in GUI mode.'''
 
-    def __init__(self, title):
-        super().__init__()
-        self._title = title
+    def __init__(self, name, byline = None):
+        super().__init__(name, byline)
         self._app = wx.App()
-        self._frame = MainFrame(None, wx.ID_ANY, title = title)
+        self._frame = MainFrame(name, byline, None, wx.ID_ANY)
         self._app.SetTopWindow(self._frame)
         self._frame.Center()
         self._frame.Show(True)
@@ -165,8 +168,9 @@ class ControlGUI(ControlBase):
 class MainFrame(wx.Frame):
     '''Defines the main application GUI frame.'''
 
-    def __init__(self, *args, **kwds):
-        self._title = kwds['title']
+    def __init__(self, name, byline, *args, **kwds):
+        self._name = name
+        self._byline = byline
         self._cancel = False
         self._height = 330 if sys.platform.startswith('win') else 300
         self._width  = 500
@@ -174,7 +178,8 @@ class MainFrame(wx.Frame):
         kwds["style"] = kwds.get("style", 0) | wx.DEFAULT_FRAME_STYLE | wx.TAB_TRAVERSAL
         wx.Frame.__init__(self, *args, **kwds)
         self.panel = wx.Panel(self)
-        self.headline = wx.StaticText(self.panel, wx.ID_ANY, self._title, style = wx.ALIGN_CENTER)
+        headline = self._name + ((' — ' + self._byline) if self._byline else '')
+        self.headline = wx.StaticText(self.panel, wx.ID_ANY, headline, style = wx.ALIGN_CENTER)
         self.headline.SetFont(wx.Font(14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_ITALIC,
                                       wx.FONTWEIGHT_BOLD, 0, "Arial"))
 
@@ -222,7 +227,7 @@ class MainFrame(wx.Frame):
         self.helpMenu.Append(self.helpItem)
         self.helpMenu.AppendSeparator()
         self.aboutItem = wx.MenuItem(self.helpMenu, wx.ID_ABOUT,
-                                     "&About " + self._title,
+                                     "&About " + self._name,
                                      wx.EmptyString, wx.ITEM_NORMAL)
         self.helpMenu.Append(self.aboutItem)
         self.menuBar.Append(self.helpMenu, "Help")
@@ -242,7 +247,7 @@ class MainFrame(wx.Frame):
 
         # Now that we created all the elements, set layout and placement.
         self.SetSize((self._width, self._height))
-        self.SetTitle(self._title)
+        self.SetTitle(self._name)
         self.outermost_sizer = wx.BoxSizer(wx.VERTICAL)
         self.outermost_sizer.AddSpacer(5)
         self.outermost_sizer.Add(self.headline, 0, wx.ALIGN_CENTER, 0)
@@ -302,7 +307,7 @@ class MainFrame(wx.Frame):
     def on_about(self, event):
         if __debug__: log('opening About window')
         dlg = wx.adv.AboutDialogInfo()
-        dlg.SetName(self._title)
+        dlg.SetName(self._name)
         this_module = sys.modules[__package__]
         dlg.SetVersion(this_module.__version__)
         dlg.SetLicense(this_module.__license__)
@@ -397,7 +402,7 @@ class UserDialog(wx.Dialog):
 
 
     def __set_properties(self):
-        self.SetTitle(self._title)
+        self.SetTitle(self._name)
         self.search_label.SetToolTip('A search string or the full URL of a search in caltech.tind.io')
         self.search.SetMinSize((330, 22))
         self.output_label.SetToolTip('The file where the downloaded results should be written')
