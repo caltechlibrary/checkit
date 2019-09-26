@@ -21,7 +21,6 @@ import string
 import subprocess
 import sys
 import webbrowser
-import wx
 
 import checkit
 from checkit.debug import log
@@ -252,19 +251,3 @@ def open_url(url):
     default approach.'''
     if __debug__: log('opening url {}', url)
     webbrowser.open(url)
-
-
-def file_to_open(text, wildcard = 'Any file (*.*)|*.*'):
-    app = wx.App(False)
-    frame = wx.Frame(None, -1, __package__)
-    fd = wx.FileDialog(frame, text, defaultDir = os.getcwd(), wildcard = wildcard,
-                       style = wx.FD_OPEN | wx.FD_FILE_MUST_EXIST)
-    return None if fd.ShowModal() == wx.ID_CANCEL else fd.GetPath()
-
-
-def file_to_save(text):
-    app = wx.App(False)
-    frame = wx.Frame(None, -1, __package__)
-    fd = wx.FileDialog(frame, text, defaultDir = os.getcwd(),
-                       style = wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT)
-    return None if fd.ShowModal() == wx.ID_CANCEL else fd.GetPath()
