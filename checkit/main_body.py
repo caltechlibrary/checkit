@@ -1,3 +1,4 @@
+import csv
 import os
 import os.path as path
 import sys
@@ -9,7 +10,7 @@ import wx
 
 from .debug import log
 from .exceptions import *
-from .files import readable, writable, file_in_use
+from .files import readable, writable, file_in_use, rename_existing
 from .network import network_available
 
 
@@ -49,7 +50,7 @@ class MainBody(Thread):
         # to interpret, and force the controller to quit.
         try:
             notifier.info('Welcome to ' + controller.app_name)
-            self.main_body()
+            self._run()
             notifier.info('Done.')
         except Exception as ex:
             if __debug__: log('exception in main body')
@@ -64,51 +65,54 @@ class MainBody(Thread):
         pass
 
 
-    def main_body(self):
-        '''The main body.'''
-
+    def _run(self):
         # Set shortcut variables for better code readability below.
         infile     = self._infile
         outfile    = self._outfile
         controller = self._controller
-        accessor   = self._accessor
         notifier   = self._notifier
 
-        # Preliminary sanity checks -------------------------------------------
+        # Do basic sanity checks ----------------------------------------------
 
-        notifier.info('Performing initial checks')
-
+        self._notifier.info('Performing initial checks')
         if not network_available():
-            notifier.fatal('No network connection.')
-            return
+            self._notifier.fatal('No network connection.')
+
+        # Get input and output files ------------------------------------------
 
         if not infile and controller.is_gui:
             notifier.info('Asking user for input file')
             infile = controller.open_file('Open barcode file', 'CSV file|*.csv|Any file|*.*')
         if not infile:
-            notifier.warn('No input file -- nothing to do')
+            notifier.error('No input file')
             return
         if not readable(infile):
-            notifier.warn('Cannot read file: {}'.format(infile))
+            notifier.error('Cannot read file: {}'.format(infile))
             return
 
         if not outfile and controller.is_gui:
             notifier.info('Asking user for output file')
             outfile = controller.save_file('Output destination file')
         if not outfile:
-            notifier.info('No output file specified -- cannot continue')
+            notifier.error('No output file specified')
             return
         if path.exists(outfile):
-            if file_in_use(outfile):
-                notifier.info('File is open by another application: {}'.format(outfile))
-                return
-            elif not writable(outfile):
-                notifier.info('Unable to write to file: {}'.format(outfile))
-                return
-        else:
-            dest_dir = path.dirname(outfile) or os.getcwd()
-            if not writable(dest_dir):
-                notifier.info('Cannot write to folder: {}'.format(dest_dir))
-                return
+            rename_existing(outfile)
+        if file_in_use(outfile):
+            details = '{} appears to be open in another program'.format(outfile)
+            notifier.error('Cannot write output file', details = details)
+            return
+        if path.exists(outfile) and not writable(outfile):
+            details = 'You may not have write permissions to {} '.format(outfile)
+            notifier.error('Cannot write output file', details = details)
+            return
 
-        # Main work -----------------------------------------------------------
+        if not outfile.endswith('.csv'):
+            outfile += '.csv'
+
+        # Read the input file and query TIND ----------------------------------
+
+        notifier.info('Reading file {}', infile)
+        barcode_list = []
+        with open(infile, mode="r") as f:
+            barcode_list = [row[0] for row in csv.reader(f)]
