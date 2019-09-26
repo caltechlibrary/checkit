@@ -25,7 +25,6 @@ from checkit.debug import set_debug, log
 from checkit.main_body import MainBody
 from checkit.messages import MessageHandlerGUI, MessageHandlerCLI
 from checkit.network import network_available
-from checkit.progress import ProgressIndicatorGUI, ProgressIndicatorCLI
 
 
 # Main program.
@@ -37,7 +36,7 @@ from checkit.progress import ProgressIndicatorGUI, ProgressIndicatorCLI
     input_csv  = ('input file containing list of barcodes',             'option', 'i'),
     no_keyring = ('do not store credentials in a keyring service',      'flag',   'K'),
     output_csv = ('output file where results should be written as CSV', 'option', 'o'),
-    password   = ('Caltech access user password',                       'option', 'p'),
+    password   = ('Caltech access password',                            'option', 'p'),
     reset_keys = ('reset user and password used',                       'flag',   'R'),
     user       = ('Caltech access user name',                           'option', 'u'),
     version    = ('print version info and exit',                        'flag',   'V'),
@@ -74,41 +73,40 @@ def main(no_color = False, no_gui = False, input_csv = 'I', no_keyring = False,
 
     # Do the real work --------------------------------------------------------
 
-    tracer = controller = accessor = notifier = None
+    controller = accessor = notifier = exception = None
     try:
         if __debug__: log('initializing handlers')
         byline = 'look up barcodes in Caltech TIND'
         if use_gui:
-            controller = ControlGUI('Check It!', byline)
-            tracer     = ProgressIndicatorGUI()
+            controller = ControlGUI('Check It!', byline, debugging)
             accessor   = AccessHandlerGUI(user, password)
             notifier   = MessageHandlerGUI()
         else:
-            controller = ControlCLI('Check It!', byline)
-            tracer     = ProgressIndicatorCLI(use_color)
+            controller = ControlCLI('Check It!', byline, debugging)
             accessor   = AccessHandlerCLI(user, password, use_keyring, reset_keys)
             notifier   = MessageHandlerCLI(use_color)
 
         if __debug__: log('starting main body thread')
-        body = MainBody(infile, outfile, controller, accessor, notifier, tracer, debugging)
+        body = MainBody(infile, outfile, controller, accessor, notifier)
         controller.run(body)
-        if body.exception:
-            raise body.exception
-        tracer.update('Done')
+        exception = body.exception
     except (KeyboardInterrupt, UserCancelled) as ex:
         if __debug__: log('received {}', ex.__class__.__name__)
     except Exception as ex:
-        from traceback import format_exc
-        details = '{}\n{}'.format(str(ex), format_exc())
+        # MainBody exceptions are caught in the thread, so this is something else.
+        exception = sys.exc_info()
+
+    # Common exception handling regardless of whether they came from.
+    if exception:
+        from traceback import format_exception
+        details = ''.join(format_exception(*exception))
         if __debug__: log('Exception: ' + details)
         if debugging:
             import pdb; pdb.set_trace()
-        if tracer:
-            tracer.stop('Stopping due to error')
         if notifier:
-            notifier.fatal('Encountered an error', details)
-    if controller:
-        controller.quit()
+            notifier.fatal('Encountered an error', details = details)
+        if controller:
+            controller.quit()
 
 
 # Miscellaneous utilities.
