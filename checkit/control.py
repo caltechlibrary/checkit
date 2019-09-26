@@ -81,22 +81,10 @@ from .logo import getLogoIcon
 class ControlBase():
     '''User interface controller base class.'''
 
-    def __init__(self, name, byline = None):
+    def __init__(self, name, byline = None, debugging = False):
         self._name = name
         self._byline = byline
-
-
-    @property
-    def is_gui():
-        '''Returns True if the GUI version of the interface is being used.'''
-        return None
-
-
-class ControlCLI(ControlBase):
-    '''User interface controller in command-line interface mode.'''
-
-    def __init__(self, name, byline = None):
-        super().__init__(name, byline)
+        self._debugging = debugging
 
 
     @property
@@ -105,14 +93,27 @@ class ControlCLI(ControlBase):
         return False
 
 
+    @property
+    def debugging(self):
+        '''Returns True if debug mode has been turned on.'''
+        return self._debugging
+
+
+class ControlCLI(ControlBase):
+    '''User interface controller in command-line interface mode.'''
+
+    def __init__(self, name, byline = None, debugging = False):
+        super().__init__(name, byline, debugging)
+
+
     def run(self, worker):
         self._worker = worker
-        if worker:
-            if __debug__: log('calling start() on worker')
-            worker.start()              # Start the thread
-            worker.join()               # Wait until thread exits
-            if __debug__: log('calling stop() on worker')
-            worker.stop()               # Force stop subthreads
+        if __debug__: log('calling start() on worker')
+        worker.start()
+        if __debug__: log('waiting for worker to finish')
+        worker.join()
+        if __debug__: log('calling stop() on worker')
+        worker.stop()
 
 
     def quit(self):
@@ -126,8 +127,8 @@ class ControlCLI(ControlBase):
 class ControlGUI(ControlBase):
     '''User interface controller in GUI mode.'''
 
-    def __init__(self, name, byline = None):
-        super().__init__(name, byline)
+    def __init__(self, name, byline = None, debugging = False):
+        super().__init__(name, byline, debugging)
         self._app = wx.App()
         self._frame = MainFrame(name, byline, None, wx.ID_ANY)
         self._app.SetTopWindow(self._frame)
@@ -143,12 +144,13 @@ class ControlGUI(ControlBase):
 
 
     def run(self, worker):
-        if __debug__: log('starting worker and main GUI loop')
         self._worker = worker
         if __debug__: log('calling start() on worker')
         worker.start()
         if __debug__: log('starting main GUI loop')
         self._app.MainLoop()
+        if __debug__: log('waiting for worker to finish')
+        worker.join()
         if __debug__: log('calling stop() on worker')
         worker.stop()
 
@@ -167,9 +169,9 @@ class ControlGUI(ControlBase):
         if __debug__: log('sending message to open_file')
         wx.CallAfter(pub.sendMessage, "open_file", return_queue = return_queue,
                      message = message, file_pattern = file_pattern)
-        if __debug__: log('open_file blocking to get results')
+        if __debug__: log('blocking to get results')
         return_queue = return_queue.get()
-        if __debug__: log('open_file got results')
+        if __debug__: log('got results')
         return return_queue
 
 
@@ -178,9 +180,9 @@ class ControlGUI(ControlBase):
         if __debug__: log('sending message to save_file')
         wx.CallAfter(pub.sendMessage, "save_file", return_queue = return_queue,
                      message = message)
-        if __debug__: log('save_file blocking to get results')
+        if __debug__: log('blocking to get results')
         return_queue = return_queue.get()
-        if __debug__: log('save_file got results')
+        if __debug__: log('got results')
         return return_queue
 
 
