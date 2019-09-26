@@ -296,7 +296,7 @@ class MainFrame(wx.Frame):
         self.Centre()
 
         # Finally, hook in message-passing interface.
-        pub.subscribe(self.progress_message, "progress_message")
+        pub.subscribe(self.info_message, "info_message")
         pub.subscribe(self.open_file, "open_file")
         pub.subscribe(self.save_file, "save_file")
 
@@ -305,8 +305,8 @@ class MainFrame(wx.Frame):
         if __debug__: log('got Exit/Cancel')
         self._cancel = True
         wx.BeginBusyCursor()
-        self.progress_message('')
-        self.progress_message('Stopping work – this may take a few moments')
+        self.info_message('')
+        self.info_message('Stopping work – this may take a few moments')
 
         # We can't call pub.sendMessage from this function, nor does it work
         # to call it using wx.CallAfter directly from this function: both
@@ -359,7 +359,7 @@ class MainFrame(wx.Frame):
         return True
 
 
-    def progress_message(self, message):
+    def info_message(self, message):
         self.text_area.SetInsertionPointEnd()
         self.text_area.AppendText(message + (' ...\n' if message else ''))
         self.text_area.ShowPosition(self.text_area.GetLastPosition())
