@@ -106,12 +106,13 @@ class MessageHandlerCLI(MessageHandlerBase):
         print(self.error_text(text, *args), flush = True)
 
 
-    def fatal(self, text, *args):
+    def fatal(self, text, *args, **kwargs):
         '''Prints a message reporting a fatal error.  This method does not
         exit the program; it leaves that to the caller in case the caller
         needs to perform additional tasks before exiting.
         '''
         if __debug__: log(text, *args)
+        text += '\n' + kwargs['details'] if 'details' in kwargs else ''
         print(self.fatal_text(text, *args), flush = True)
 
 
