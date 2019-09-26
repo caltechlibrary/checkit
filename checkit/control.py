@@ -81,10 +81,15 @@ from .logo import getLogoIcon
 class ControlBase():
     '''User interface controller base class.'''
 
-    def __init__(self, name, byline = None, debugging = False):
-        self._name = name
+    def __init__(self, app_name, byline = None, debugging = False):
+        self._name = app_name
         self._byline = byline
         self._debugging = debugging
+
+
+    @property
+    def app_name(self):
+        return self._name
 
 
     @property
