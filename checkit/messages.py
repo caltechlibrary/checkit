@@ -133,25 +133,26 @@ class MessageHandlerGUI(MessageHandlerBase):
     def info(self, text, *args):
         '''Prints an informational message.'''
         if __debug__: log('generating info notice')
-        wx.CallAfter(pub.sendMessage, "progress_message",
-                     message = text.format(*args))
+        wx.CallAfter(pub.sendMessage, "info_message", message = text.format(*args))
 
 
     def warn(self, text, *args):
         '''Prints a nonfatal, noncritical warning message.'''
         if __debug__: log('generating warning notice')
-        wx.CallAfter(pub.sendMessage, "progress_message",
+        wx.CallAfter(pub.sendMessage, "info_message",
                      message = 'Warning: ' + text.format(*args))
 
 
-    def error(self, text, *args):
+    def error(self, text, *args, **kwargs):
         '''Prints a message reporting a critical error.'''
         if __debug__: log('generating error notice')
+        message = text.format(*args)
+        details = kwargs['details'] if 'details' in kwargs else ''
         if wx.GetApp().TopWindow:
-            wx.CallAfter(self._show_dialog, text.format(*args), 'error')
+            wx.CallAfter(self._show_dialog, message, details, 'error')
         else:
             # The app window is gone, so wx.CallAfter won't work.
-            self._show_dialog(text.format(*args), 'error')
+            self._show_dialog(message, details, 'error')
         self._wait()
 
 
@@ -165,15 +166,13 @@ class MessageHandlerGUI(MessageHandlerBase):
         before exiting.
         '''
         if __debug__: log('generating fatal error notice')
+        message = text.format(*args)
+        details = kwargs['details'] if 'details' in kwargs else ''
         if wx.GetApp().TopWindow:
-            wx.CallAfter(self._show_dialog, text.format(*args),
-                         kwargs['details'] if 'details' in kwargs else '',
-                         severity = 'fatal')
+            wx.CallAfter(self._show_dialog, message, details, 'fatal')
         else:
             # The app window is gone, so wx.CallAfter won't work.
-            self._show_dialog(text.format(*args),
-                              kwargs['details'] if 'details' in kwargs else '',
-                              severity = 'fatal')
+            self._show_dialog(message, details, 'fatal')
         self._wait()
 
 
@@ -203,10 +202,12 @@ class MessageHandlerGUI(MessageHandlerBase):
         frame = self._current_frame()
         if 'fatal' in severity:
             short = text
-            style = wx.OK | wx.HELP | wx.ICON_ERROR
+            style = wx.OK | wx.ICON_ERROR
         else:
             short = text + '\n\nWould you like to try to continue?\n(Click "no" to quit now.)'
-            style = wx.YES_NO | wx.YES_DEFAULT | wx.HELP | wx.ICON_EXCLAMATION
+            style = wx.YES_NO | wx.YES_DEFAULT | wx.ICON_EXCLAMATION
+        if details:
+            style |= wx.HELP
         if __debug__: log('showing message dialog')
         dlg = wx.MessageDialog(frame, message = short, style = style,
                                caption = "Check It! has encountered a problem")
@@ -231,6 +232,7 @@ class MessageHandlerGUI(MessageHandlerBase):
             dlg.Destroy()
             frame.Destroy()
             self._queue.put(True)
+            wx.CallAfter(pub.sendMessage, 'quit')
         else:
             dlg.Destroy()
             self._queue.put(True)
