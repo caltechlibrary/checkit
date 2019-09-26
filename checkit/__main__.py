@@ -57,10 +57,11 @@ def main(no_color = False, no_gui = False, input_csv = 'I', no_keyring = False,
     use_color   = not no_color
     use_keyring = not no_keyring
     use_gui     = not no_gui
+    debugging   = debug != 'OUT'
 
     # Preprocess arguments and handle early exits -----------------------------
 
-    if debug != 'OUT':
+    if debugging:
         set_debug(True, debug)
     if version:
         print_version()
@@ -73,46 +74,41 @@ def main(no_color = False, no_gui = False, input_csv = 'I', no_keyring = False,
 
     # Do the real work --------------------------------------------------------
 
+    tracer = controller = accessor = notifier = None
     try:
         if __debug__: log('initializing handlers')
-        tracer = controller = accessor = notifier = None
+        byline = 'look up barcodes in Caltech TIND'
         if use_gui:
-            controller = ControlGUI('Check It!')
+            controller = ControlGUI('Check It!', byline)
             tracer     = ProgressIndicatorGUI()
             accessor   = AccessHandlerGUI(user, password)
             notifier   = MessageHandlerGUI()
         else:
-            controller = ControlCLI('Check It!')
+            controller = ControlCLI('Check It!', byline)
             tracer     = ProgressIndicatorCLI(use_color)
             accessor   = AccessHandlerCLI(user, password, use_keyring, reset_keys)
             notifier   = MessageHandlerCLI(use_color)
 
         if __debug__: log('starting main body thread')
-        body = MainBody(infile, outfile, controller, accessor, notifier, tracer, debug)
-        #controller.start(body)
+        body = MainBody(infile, outfile, controller, accessor, notifier, tracer, debugging)
+        controller.run(body)
+        if body.exception:
+            raise body.exception
+        tracer.update('Done')
     except (KeyboardInterrupt, UserCancelled) as ex:
-        if __debug__: log('received {}', ex.__name__)
+        if __debug__: log('received {}', ex.__class__.__name__)
     except Exception as ex:
-        # If something goes wrong, we may not even have initialize our objects,
-        # so we have to act with an abundance of caution here.
         from traceback import format_exc
-        msg = 'Exception: {}\n{}'.format(str(ex), format_exc())
-        if __debug__: log(msg)
-        if debug != 'OUT':
-            if tracer:
-                tracer.stop(msg)
+        details = '{}\n{}'.format(str(ex), format_exc())
+        if __debug__: log('Exception: ' + details)
+        if debugging:
             import pdb; pdb.set_trace()
-        else:
-            if tracer:
-                tracer.stop('Stopping due to error')
-            if notifier:
-                notifier.fatal('Encountered an error', str(err) + '\n' + format_exc())
-            if controller:
-                controller.stop()
-    else:
-        tracer.stop('Done')
-        controller.stop()
-
+        if tracer:
+            tracer.stop('Stopping due to error')
+        if notifier:
+            notifier.fatal('Encountered an error', details)
+    if controller:
+        controller.quit()
 
 
 # Miscellaneous utilities.
