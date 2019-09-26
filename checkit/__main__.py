@@ -99,12 +99,13 @@ def main(no_color = False, no_gui = False, input_csv = 'I', no_keyring = False,
     # Common exception handling regardless of whether they came from.
     if exception:
         from traceback import format_exception
+        error = str(exception[1])
         details = ''.join(format_exception(*exception))
-        if __debug__: log('Exception: ' + details)
+        if __debug__: log('Exception: {}\n{}', error, details)
         if debugging:
             import pdb; pdb.set_trace()
         if notifier:
-            notifier.fatal('Encountered an error', details = details)
+            notifier.fatal('Encountered an error: {}', error, details = details)
         if controller:
             controller.quit()
 
