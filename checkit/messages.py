@@ -18,6 +18,7 @@ file "LICENSE" for more information.
 import colorful
 colorful.use_256_ansi_colors()
 
+from   pubsub import pub
 import queue
 import sys
 import wx
@@ -31,49 +32,87 @@ from .exceptions import *
 # .............................................................................
 # The basic principle of writing the classes (like this one) that get used in
 # MainBody is that they should take the information they need, rather than
-# putting the info into the controller object (i.e., CheckItControlGUI or
-# CheckItControlCLI).  This means, for example, that 'use_color' is handed to
-# the CLI version of this object, not to the base class or the CheckItControl*
-# classes, even though use_color is something that may be relevant to more
-# than one of the main classes.  This is a matter of separation of concerns
-# and information hiding.
+# putting the info into the controller object (i.e., ControlGUI or
+# ControlCLI).  This means, for example, that 'use_color' is handed to the
+# CLI version of this object, not to the base class or the Control* classes,
+# even though use_color is something that may be relevant to more than one of
+# the main classes.  This is a matter of separation of concerns and
+# information hiding.
 
 class MessageHandlerBase():
     '''Base class for message-printing classes in Check It!'''
 
     def __init__(self):
+        self._colorize = False
         pass
+
+
+    def info_text(self, text, *args):
+        '''Prints an informational message.'''
+        return styled(text.format(*args), 'info', self._colorize)
+
+
+    def warn_text(self, text, *args):
+        '''Prints a nonfatal, noncritical warning message.'''
+        return styled(text.format(*args), 'warn', self._colorize)
+
+
+    def error_text(self, text, *args):
+        '''Prints a message reporting a critical error.'''
+        return styled(text.format(*args), 'error', self._colorize)
+
+
+    def fatal_text(self, text, *args):
+        '''Prints a message reporting a fatal error.  This method does not
+        exit the program; it leaves that to the caller in case the caller
+        needs to perform additional tasks before exiting.
+        '''
+        return styled('FATAL: ' + text.format(*args), ['error', 'bold'], self._colorize)
 
 
 class MessageHandlerCLI(MessageHandlerBase):
     '''Class for printing console messages and asking the user questions.'''
 
-    def __init__(self, use_color):
+    def __init__(self, use_color, quiet = False):
         super().__init__()
         self._colorize = use_color
+        self._quiet = quiet
 
 
-    def info(self, text, details = ''):
+    def use_color(self):
+        return self._colorize
+
+
+    def be_quiet(self):
+        return self._quiet
+
+
+    def info(self, text, *args):
         '''Prints an informational message.'''
-        msg(text, 'info', self._colorize)
+        if __debug__: log(text, *args)
+        if not self._quiet:
+            print(self.info_text(text, *args), flush = True)
 
 
-    def warn(self, text, details = ''):
+    def warn(self, text, *args):
         '''Prints a nonfatal, noncritical warning message.'''
-        msg('Warning: ' + text, 'warn', self._colorize)
+        if __debug__: log(text, *args)
+        print(self.warn_text(text, *args), flush = True)
 
 
-    def error(self, text, details = ''):
+    def error(self, text, *args):
         '''Prints a message reporting a critical error.'''
-        msg('Error: ' + text, 'error', self._colorize)
+        if __debug__: log(text, *args)
+        print(self.error_text(text, *args), flush = True)
 
 
-    def fatal(self, text, details = ''):
+    def fatal(self, text, *args):
         '''Prints a message reporting a fatal error.  This method does not
         exit the program; it leaves that to the caller in case the caller
         needs to perform additional tasks before exiting.
         '''
-        msg('FATAL: ' + text, ['error', 'bold'], self._colorize)
+        if __debug__: log(text, *args)
+        print(self.fatal_text(text, *args), flush = True)
 
 
     def yes_no(self, question):
@@ -90,35 +129,50 @@ class MessageHandlerGUI(MessageHandlerBase):
         self._response = None
 
 
-    def info(self, text, details = ''):
+    def info(self, text, *args):
         '''Prints an informational message.'''
         if __debug__: log('generating info notice')
-        wx.CallAfter(self._note, text, details, 'info')
-        self._wait()
+        wx.CallAfter(pub.sendMessage, "progress_message",
+                     message = text.format(*args))
 
 
-    def warn(self, text, details = ''):
+    def warn(self, text, *args):
         '''Prints a nonfatal, noncritical warning message.'''
         if __debug__: log('generating warning notice')
-        wx.CallAfter(self._note, text, details, 'warn')
-        self._wait()
+        wx.CallAfter(pub.sendMessage, "progress_message",
+                     message = 'Warning: ' + text.format(*args))
 
 
-    def error(self, text, details = ''):
+    def error(self, text, *args):
         '''Prints a message reporting a critical error.'''
         if __debug__: log('generating error notice')
-        wx.CallAfter(self._dialog, text, details, 'error')
+        if wx.GetApp().TopWindow:
+            wx.CallAfter(self._show_dialog, text.format(*args), 'error')
+        else:
+            # The app window is gone, so wx.CallAfter won't work.
+            self._show_dialog(text.format(*args), 'error')
         self._wait()
 
 
-    def fatal(self, text, details = ''):
-        '''Prints a message reporting a fatal error.  This method does not
-        exit the program; it leaves that to the caller in case the caller
-        needs to perform additional tasks before exiting.
+    def fatal(self, text, *args, **kwargs):
+        '''Prints a message reporting a fatal error.  The keyword argument
+        'details' can be supplied to pass a longer explanation that will be
+        displayed if the user presses the 'Help' button in the dialog.
+
+        Note that this method does not exit the program; it leaves that to
+        the caller in case the caller needs to perform additional tasks
+        before exiting.
         '''
         if __debug__: log('generating fatal error notice')
-        #wx.CallAfter(self._dialog, text, details, 'fatal')
-        self._dialog(text, details, 'fatal')
+        if wx.GetApp().TopWindow:
+            wx.CallAfter(self._show_dialog, text.format(*args),
+                         kwargs['details'] if 'details' in kwargs else '',
+                         severity = 'fatal')
+        else:
+            # The app window is gone, so wx.CallAfter won't work.
+            self._show_dialog(text.format(*args),
+                              kwargs['details'] if 'details' in kwargs else '',
+                              severity = 'fatal')
         self._wait()
 
 
@@ -127,25 +181,24 @@ class MessageHandlerGUI(MessageHandlerBase):
         if __debug__: log('generating yes/no dialog')
         wx.CallAfter(self._yes_no, question)
         self._wait()
-        if __debug__: log('got {} response', self._response)
+        if __debug__: log('got response: {}', self._response)
         return self._response
 
 
-    def _note(self, text, details = '', severity = 'info'):
+    def _show_note(self, text, *args, severity = 'info'):
         '''Displays a simple notice with a single OK button.'''
         frame = self._current_frame()
         icon = wx.ICON_WARNING if severity == 'warn' else wx.ICON_INFORMATION
-        msg = (text + '\n\n' + details) if details else text
         if __debug__: log('showing note dialog')
-        dlg = wx.GenericMessageDialog(frame, msg, caption = "Check It!",
-                                      style = wx.OK | icon)
+        dlg = wx.GenericMessageDialog(frame, text.format(*args),
+                                      caption = "Check It!", style = wx.OK | icon)
         clicked = dlg.ShowModal()
         dlg.Destroy()
         frame.Destroy()
         self._queue.put(True)
 
 
-    def _dialog(self, text, details = '', severity = 'error'):
+    def _show_dialog(self, text, details, severity = 'error'):
         frame = self._current_frame()
         if 'fatal' in severity:
             short = text
@@ -213,98 +266,49 @@ class MessageHandlerGUI(MessageHandlerBase):
 # Message utility funcions.
 # .............................................................................
 
-def msg(text, flags = None, colorize = True):
-    '''Like the standard print(), but flushes the output immediately and
-    colorizes the output by default. Flushing immediately is useful when
-    piping the output of a script, because Python by default will buffer the
-    output in that situation and this makes it very difficult to see what is
-    happening in real time.
-    '''
-    if colorize and 'termcolor' in sys.modules:
-        print(color(text, flags), flush = True)
-    else:
-        print(text, flush = True)
+_STYLES_INITIALIZED = False
 
-
-def color(text, flags = None, colorize = True):
-    '''Color-code the 'text' according to 'flags' if 'colorize' is True.
+def styled(text, flags = None, colorize = True):
+    '''Style the 'text' according to 'flags' if 'colorize' is True.
     'flags' can be a single string or a list of strings, as follows.
     Explicit colors (when not using a severity color code):
-       'white', 'blue', 'grey', 'cyan', 'magenta'
-    Additional color codes reserved for message severities:
+       Colors like 'white', 'blue', 'grey', 'cyan', 'magenta', or other colors
+       defined in our messages_styles.py
+    Additional color flags reserved for message severities:
        'info'  = informational (green)
        'warn'  = warning (yellow)
        'error' = severe error (red)
-    Optional color modifiers:
-       'underline', 'bold', 'reverse', 'dark'
+       'fatal' = really severe error (red, bold, underlined)
+    Optional style additions:
+       'bold', 'underlined', 'italic', 'blink', 'struckthrough'
     '''
-    (prefix, color_name, attributes) = _color_codes(flags)
-    if colorize:
-        if attributes and color_name:
-            return colored(text, color_name, attrs = attributes)
-        elif color_name:
-            return colored(text, color_name)
-        elif attributes:
-            return colored(text, attrs = attributes)
-        else:
-            return text
-    elif prefix:
-        return prefix + ': ' + str(text)
-    else:
+    # Fail early if we're not colorizing.
+    if not colorize:
         return text
 
-
-# Internal utilities.
-# .............................................................................
-
-def _print_header(text, flags, quiet = False, colorize = True):
-    if not quiet:
-        msg('')
-        msg('{:-^78}'.format(' ' + text + ' '), flags, colorize)
-        msg('')
-
-
-def _color_codes(flags):
-    color_name  = ''
-    prefix = ''
+    # Lazy-load the style definitions if needed.
+    global _STYLES_INITIALIZED
+    if not _STYLES_INITIALIZED:
+        import microarchiver.messages_styles
+        _STYLES_INITIALIZED = True
+    from microarchiver.messages_styles import _STYLES
     if type(flags) is not list:
         flags = [flags]
-    if sys.platform.startswith('win'):
-        attrib = [] if 'dark' in flags else ['bold']
-    else:
-        attrib = []
-    if 'error' in flags:
-        prefix = 'ERROR'
-        color_name = 'red'
-    if 'warning' in flags or 'warn' in flags:
-        prefix = 'WARNING'
-        color_name = 'yellow'
-    if 'info' in flags:
-        color_name = 'green'
-    if 'white' in flags:
-        color_name = 'white'
-    if 'blue' in flags:
-        color_name = 'blue'
-    if 'grey' in flags:
-        color_name = 'grey'
-    if 'cyan' in flags:
-        color_name = 'cyan'
-    if 'magenta' in flags:
-        color_name = 'magenta'
-    if 'underline' in flags:
-        attrib.append('underline')
-    if 'bold' in flags:
-        attrib.append('bold')
-    if 'reverse' in flags:
-        attrib.append('reverse')
-    if 'dark' in flags:
-        attrib.append('dark')
-    return (prefix, color_name, attrib)
 
-
-# Please leave the following for Emacs users.
-# ......................................................................
-# Local Variables:
-# mode: python
-# python-indent-offset: 4
-# End:
+    # Use colorful's clever and-or overloading mechanism to concatenate the
+    # style definition, apply it to the text, and return the result.
+    attribs = colorful.reset
+    for c in flags:
+        if c == 'reset':
+            attribs &= colorful.reset
+        elif c in _STYLES:
+            attribs &= _STYLES[c]
+        else:
+            # Color names for colorful have to start with a lower case letter,
+            # which is really easy to screw up.  Let's help ourselves.
+            c = c[:1].lower() + c[1:]
+            try:
+                attribs &= getattr(colorful, c)
+            except Exception:
+                if __debug__: log('colorful does not recognize color {}', c)
+    return attribs | text
