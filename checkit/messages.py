@@ -1,5 +1,5 @@
 '''
-messages: message-printing utilities for Lost It!
+messages: message-printing utilities for Check It!
 
 Authors
 -------
@@ -9,41 +9,37 @@ Michael Hucka <mhucka@caltech.edu> -- Caltech Library
 Copyright
 ---------
 
-Copyright (c) 2018-2019 by the California Institute of Technology.  This code
-is open-source software released under a 3-clause BSD license.  Please see the
+Copyright (c) 2019 by the California Institute of Technology.  This code is
+open-source software released under a 3-clause BSD license.  Please see the
 file "LICENSE" for more information.
 '''
+
+
+import colorful
+colorful.use_256_ansi_colors()
 
 import queue
 import sys
 import wx
 import wx.lib.dialogs
 
-try:
-    from termcolor import colored
-    if sys.platform.startswith('win'):
-        import colorama
-        colorama.init()
-except:
-    pass
-
-import checkit
-from checkit.exceptions import *
+from .debug import log
+from .exceptions import *
 
 
 # Exported classes.
 # .............................................................................
 # The basic principle of writing the classes (like this one) that get used in
 # MainBody is that they should take the information they need, rather than
-# putting the info into the controller object (i.e., CheckitControlGUI or
-# CheckitControlCLI).  This means, for example, that 'use_color' is handed to
-# the CLI version of this object, not to the base class or the CheckitControl*
+# putting the info into the controller object (i.e., CheckItControlGUI or
+# CheckItControlCLI).  This means, for example, that 'use_color' is handed to
+# the CLI version of this object, not to the base class or the CheckItControl*
 # classes, even though use_color is something that may be relevant to more
 # than one of the main classes.  This is a matter of separation of concerns
 # and information hiding.
 
 class MessageHandlerBase():
-    '''Base class for message-printing classes in Lost It!'''
+    '''Base class for message-printing classes in Check It!'''
 
     def __init__(self):
         pass
@@ -96,18 +92,21 @@ class MessageHandlerGUI(MessageHandlerBase):
 
     def info(self, text, details = ''):
         '''Prints an informational message.'''
-        wx.CallAfter(self._note, text)
+        if __debug__: log('generating info notice')
+        wx.CallAfter(self._note, text, details, 'info')
         self._wait()
 
 
     def warn(self, text, details = ''):
         '''Prints a nonfatal, noncritical warning message.'''
-        wx.CallAfter(self._dialog, text, details, 'warn')
+        if __debug__: log('generating warning notice')
+        wx.CallAfter(self._note, text, details, 'warn')
         self._wait()
 
 
     def error(self, text, details = ''):
         '''Prints a message reporting a critical error.'''
+        if __debug__: log('generating error notice')
         wx.CallAfter(self._dialog, text, details, 'error')
         self._wait()
 
@@ -117,23 +116,29 @@ class MessageHandlerGUI(MessageHandlerBase):
         exit the program; it leaves that to the caller in case the caller
         needs to perform additional tasks before exiting.
         '''
-        wx.CallAfter(self._dialog, text, details, 'fatal')
+        if __debug__: log('generating fatal error notice')
+        #wx.CallAfter(self._dialog, text, details, 'fatal')
+        self._dialog(text, details, 'fatal')
         self._wait()
 
 
     def yes_no(self, question):
         '''Asks the user a yes/no question using a GUI dialog.'''
+        if __debug__: log('generating yes/no dialog')
         wx.CallAfter(self._yes_no, question)
         self._wait()
+        if __debug__: log('got {} response', self._response)
         return self._response
 
 
-    def _note(self, text):
+    def _note(self, text, details = '', severity = 'info'):
         '''Displays a simple notice with a single OK button.'''
-        frame = wx.Frame(wx.GetApp().TopWindow)
-        frame.Center()
-        dlg = wx.GenericMessageDialog(frame, text, caption = "Lost It!",
-                                      style = wx.OK | wx.ICON_INFORMATION)
+        frame = self._current_frame()
+        icon = wx.ICON_WARNING if severity == 'warn' else wx.ICON_INFORMATION
+        msg = (text + '\n\n' + details) if details else text
+        if __debug__: log('showing note dialog')
+        dlg = wx.GenericMessageDialog(frame, msg, caption = "Check It!",
+                                      style = wx.OK | icon)
         clicked = dlg.ShowModal()
         dlg.Destroy()
         frame.Destroy()
@@ -141,19 +146,19 @@ class MessageHandlerGUI(MessageHandlerBase):
 
 
     def _dialog(self, text, details = '', severity = 'error'):
-        frame = wx.Frame(wx.GetApp().TopWindow)
-        frame.Center()
+        frame = self._current_frame()
         if 'fatal' in severity:
             short = text
             style = wx.OK | wx.HELP | wx.ICON_ERROR
         else:
             short = text + '\n\nWould you like to try to continue?\n(Click "no" to quit now.)'
             style = wx.YES_NO | wx.YES_DEFAULT | wx.HELP | wx.ICON_EXCLAMATION
+        if __debug__: log('showing message dialog')
         dlg = wx.MessageDialog(frame, message = short, style = style,
-                               caption = "Lost it! has encountered a problem")
+                               caption = "Check It! has encountered a problem")
         clicked = dlg.ShowModal()
         if clicked == wx.ID_HELP:
-            body = ("Lost it! has encountered a problem:\n"
+            body = ("Check It! has encountered a problem:\n"
                     + "─"*30
                     + "\n{}\n".format(details or text)
                     + "─"*30
@@ -178,9 +183,8 @@ class MessageHandlerGUI(MessageHandlerBase):
 
 
     def _yes_no(self, question):
-        frame = wx.Frame(wx.GetApp().TopWindow)
-        frame.Center()
-        dlg = wx.GenericMessageDialog(frame, question, caption = "Lost It!",
+        frame = self._current_frame()
+        dlg = wx.GenericMessageDialog(frame, question, caption = "Check It!",
                                       style = wx.YES_NO | wx.ICON_QUESTION)
         clicked = dlg.ShowModal()
         dlg.Destroy()
@@ -192,6 +196,18 @@ class MessageHandlerGUI(MessageHandlerBase):
     def _wait(self):
         self._queue.get()
 
+
+    def _current_frame(self):
+        if wx.GetApp():
+            if __debug__: log('app window exists; building frame for dialog')
+            app = wx.GetApp()
+            frame = wx.Frame(app.TopWindow)
+        else:
+            if __debug__: log("app window doesn't exist; creating one for dialog")
+            app = wx.App(False)
+            frame = wx.Frame(None, -1, __package__)
+        frame.Center()
+        return frame
 
 
 # Message utility funcions.
