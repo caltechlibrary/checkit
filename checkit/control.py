@@ -161,6 +161,28 @@ class ControlGUI(ControlBase):
         if __debug__: log('destroying control GUI')
         wx.CallAfter(self._frame.Destroy)
 
+
+    def open_file(self, message, file_pattern):
+        return_queue = Queue()
+        if __debug__: log('sending message to open_file')
+        wx.CallAfter(pub.sendMessage, "open_file", return_queue = return_queue,
+                     message = message, file_pattern = file_pattern)
+        if __debug__: log('open_file blocking to get results')
+        return_queue = return_queue.get()
+        if __debug__: log('open_file got results')
+        return return_queue
+
+
+    def save_file(self, message):
+        return_queue = Queue()
+        if __debug__: log('sending message to save_file')
+        wx.CallAfter(pub.sendMessage, "save_file", return_queue = return_queue,
+                     message = message)
+        if __debug__: log('save_file blocking to get results')
+        return_queue = return_queue.get()
+        if __debug__: log('save_file got results')
+        return return_queue
+
 
 # Internal implementation classes.
 # .............................................................................
@@ -268,7 +290,8 @@ class MainFrame(wx.Frame):
 
         # Finally, hook in message-passing interface.
         pub.subscribe(self.progress_message, "progress_message")
-        pub.subscribe(self.user_dialog, "user_dialog")
+        pub.subscribe(self.open_file, "open_file")
+        pub.subscribe(self.save_file, "save_file")
 
 
     def on_cancel_or_quit(self, event):
@@ -336,227 +359,28 @@ class MainFrame(wx.Frame):
         return True
 
 
-    def user_dialog(self, results, search, output):
-        if __debug__: log('creating and showing user dialog')
-        dialog = UserDialog(self)
-        dialog.initialize_values(results, search, output)
-        dialog.ShowWindowModal()
-        return True
-
-
-class UserDialog(wx.Dialog):
-    '''Defines the modal dialog used for getting the search string.'''
-
-    def __init__(self, *args, **kwargs):
-        super(UserDialog, self).__init__(*args, **kwargs)
-        self._search = None
-        self._output = None
-        self._cancel = False
-        self._wait_queue = None
-
-        panel = wx.Panel(self)
-        if sys.platform.startswith('win'):
-            self.SetSize((450, 175))
+    def open_file(self, return_queue, message, file_pattern = '*.*'):
+        if __debug__: log('creating and showing open file dialog')
+        fd = wx.FileDialog(self, message, defaultDir = os.getcwd(),
+                           wildcard = file_pattern,
+                           style = wx.FD_OPEN | wx.FD_FILE_MUST_EXIST)
+        cancelled = (fd.ShowModal() == wx.ID_CANCEL)
+        file_path = None if cancelled else fd.GetPath()
+        if cancelled:
+            if __debug__: log('user cancelled dialog')
         else:
-            self.SetSize((450, 155))
-        self.explanation = wx.StaticText(panel, wx.ID_ANY,
-                                         'Please provide a search string (or URL) and a destination file',
-                                         style = wx.ALIGN_CENTER)
-        self.top_line = wx.StaticLine(panel, wx.ID_ANY)
-
-        self.search_label = wx.StaticText(panel, wx.ID_ANY, "Search (or URL): ", style = wx.ALIGN_RIGHT)
-        self.search = wx.TextCtrl(panel, wx.ID_ANY, '', style = wx.TE_PROCESS_ENTER,
-                                  size = (300, 22))
-        self.search.Bind(wx.EVT_KEY_DOWN, self.on_enter_or_tab)
-        self.search.Bind(wx.EVT_TEXT, self.on_input)
-
-        self.output_label = wx.StaticText(panel, wx.ID_ANY, "Output file: ", style = wx.ALIGN_RIGHT)
-        file_picker_height = 32 if not sys.platform.startswith('win') else 25
-        self.output = wx.FilePickerCtrl(panel, message = "Save downloaded records",
-                                        style = wx.FLP_USE_TEXTCTRL | wx.FLP_SAVE,
-                                        size = (340, file_picker_height))
-        self.output.Bind(wx.EVT_FILEPICKER_CHANGED, self.on_input)
-
-        self.bottom_line = wx.StaticLine(panel, wx.ID_ANY)
-        self.cancel_button = wx.Button(panel, wx.ID_ANY, "Cancel")
-        self.cancel_button.Bind(wx.EVT_KEY_DOWN, self.on_escape)
-        self.ok_button = wx.Button(panel, wx.ID_ANY, "OK")
-        self.ok_button.Bind(wx.EVT_KEY_DOWN, self.on_ok_enter_key)
-        self.ok_button.SetDefault()
-        self.ok_button.Disable()
-
-        # Put everything together and bind some keystrokes to events.
-        self.__set_properties()
-        self.__do_layout()
-        self.Bind(wx.EVT_BUTTON, self.on_cancel_or_quit, self.cancel_button)
-        self.Bind(wx.EVT_BUTTON, self.on_ok, self.ok_button)
-        self.Bind(wx.EVT_CLOSE, self.on_cancel_or_quit)
-
-        close_id = wx.NewId()
-        self.Bind(wx.EVT_MENU, self.on_cancel_or_quit, id = close_id)
-        accel_tbl = wx.AcceleratorTable([
-            (wx.ACCEL_CTRL, ord('W'), close_id ),
-            (wx.ACCEL_CMD, ord('.'), close_id ),
-        ])
-        self.SetAcceleratorTable(accel_tbl)
+            if __debug__: log('file path from user: {}', file_path)
+        return_queue.put(file_path)
 
 
-    def __set_properties(self):
-        self.SetTitle(self._name)
-        self.search_label.SetToolTip('A search string or the full URL of a search in caltech.tind.io')
-        self.search.SetMinSize((330, 22))
-        self.output_label.SetToolTip('The file where the downloaded results should be written')
-        self.output.SetMinSize((330, 22))
-        self.ok_button.SetFocus()
-
-
-    def __do_layout(self):
-        self.user_dialog_sizer = wx.FlexGridSizer(2, 2, 5, 0)
-        self.user_dialog_sizer.Add(self.search_label, 0, wx.ALIGN_RIGHT | wx.ALIGN_CENTER_VERTICAL, 0)
-        self.padding_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        if not sys.platform.startswith('win'):
-            self.padding_sizer.AddSpacer(5)
-        self.padding_sizer.Add(self.search, 0, wx.ALIGN_LEFT | wx.EXPAND, 0)
-        self.user_dialog_sizer.Add(self.padding_sizer, 0, wx.ALIGN_LEFT | wx.FIXED_MINSIZE, 0)
-        self.user_dialog_sizer.Add(self.output_label, 0, wx.ALIGN_RIGHT | wx.ALIGN_CENTER_VERTICAL, 0)
-        self.user_dialog_sizer.Add(self.output, 0, wx.ALIGN_BOTTOM | wx.FIXED_MINSIZE, 0)
-
-        self.button_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.button_sizer.Add((0, 0), 0, 0, 0)
-        self.button_sizer.Add(self.cancel_button, 0, wx.ALIGN_CENTER, 0)
-        self.button_sizer.Add((10, 20), 0, 0, 0)
-        self.button_sizer.Add(self.ok_button, 0, wx.ALIGN_CENTER, 0)
-        self.button_sizer.Add((10, 20), 0, wx.ALIGN_CENTER, 0)
-
-        self.outermost_sizer = wx.BoxSizer(wx.VERTICAL)
-        self.outermost_sizer.Add((420, 5), 0, wx.ALIGN_CENTER, 0)
-        self.outermost_sizer.Add(self.explanation, 0, wx.ALIGN_CENTER, 0)
-        self.outermost_sizer.Add((420, 5), 0, wx.ALIGN_CENTER, 0)
-        self.outermost_sizer.Add(self.top_line, 0, wx.EXPAND | wx.ALIGN_CENTER_VERTICAL, 0)
-        self.outermost_sizer.Add((420, 8), 0, wx.ALIGN_CENTER, 0)
-        self.outermost_sizer.Add(self.user_dialog_sizer, 1, wx.ALIGN_CENTER | wx.FIXED_MINSIZE, 5)
-        self.outermost_sizer.Add((420, 5), 0, 0, 0)
-        self.outermost_sizer.Add(self.bottom_line, 0, wx.EXPAND | wx.ALIGN_CENTER_VERTICAL, 0)
-        self.outermost_sizer.Add((420, 5), 0, 0, 0)
-        self.outermost_sizer.Add(self.button_sizer, 1, wx.ALIGN_RIGHT, 0)
-        self.outermost_sizer.Add((420, 5), 0, wx.ALIGN_CENTER, 0)
-        self.SetSizer(self.outermost_sizer)
-
-        self.Layout()
-        self.Centre()
-
-
-    def initialize_values(self, wait_queue, search, output):
-        '''Initializes values used to populate the dialog and communicate
-        with calling code.
-
-        'wait_queue' must be a Pytho queue.Queue() object.  Callers must
-        create the queue object and pass it to this function.  After creating
-        and displaying the dialog, callers can use .get() on the queue object
-        to wait until the user has either clicked OK or Cancel in the dialog.
-
-        'search' and 'output' are used to populate the form in
-        case there are preexisting values to be used as defaults.
-        '''
-
-        self._wait_queue = wait_queue
-        self._search = search
-        self._output = output
-        if self._search:
-            self.search.AppendText(self._search)
-            self.search.Refresh()
-        if self._output:
-            self.output.SetPath(self._output)
-        if search and output:
-            self.ok_button.Enable()
-
-
-    def return_values(self):
-        if __debug__: log('return_values called')
-        self._wait_queue.put((self._search, self._output, self._cancel))
-
-
-    def inputs_nonempty(self):
-        search = self.search.GetValue()
-        output = self.output.GetPath()
-        if search.strip() and output.strip():
-            return True
-        return False
-
-
-    def on_ok(self, event):
-        '''Stores the current values and destroys the dialog.'''
-
-        if __debug__: log('got OK')
-        if self.inputs_nonempty():
-            self._cancel = False
-            self._search = self.search.GetValue()
-            self._output = self.output.GetPath()
-            self.return_values()
-            self.EndModal(event.EventObject.Id)
+    def save_file(self, return_queue, message):
+        if __debug__: log('creating and showing save file dialog')
+        fd = wx.FileDialog(self, message, defaultDir = os.getcwd(),
+                           style = wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT)
+        cancelled = (fd.ShowModal() == wx.ID_CANCEL)
+        file_path = None if cancelled else fd.GetPath()
+        if cancelled:
+            if __debug__: log('user cancelled dialog')
         else:
-            if __debug__: log('has incomplete inputs')
-            self.complain_incomplete_values(event)
-
-
-    def on_cancel_or_quit(self, event):
-        if __debug__: log('got Cancel')
-        self._cancel = True
-        self.return_values()
-        self.EndModal(event.EventObject.Id)
-
-
-    def on_input(self, event):
-        if self.search.GetValue() and self.output.GetPath():
-            self.ok_button.Enable()
-        else:
-            self.ok_button.Disable()
-
-
-    def on_escape(self, event):
-        keycode = event.GetKeyCode()
-        if keycode == wx.WXK_ESCAPE:
-            if __debug__: log('got Escape')
-            self.on_cancel_or_quit(event)
-        else:
-            event.Skip()
-
-
-    def on_ok_enter_key(self, event):
-        keycode = event.GetKeyCode()
-        if keycode in [wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER, wx.WXK_SPACE]:
-            self.on_ok(event)
-        elif keycode == wx.WXK_ESCAPE:
-            self.on_cancel_or_quit(event)
-        else:
-            event.EventObject.Navigate()
-
-
-    def on_enter_or_tab(self, event):
-        keycode = event.GetKeyCode()
-        if keycode in [wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER]:
-            # If the ok button is enabled, we interpret return/enter as "done".
-            if self.ok_button.IsEnabled():
-                self.on_ok(event)
-            # If focus is on the login line, move to output.
-            if wx.Window.FindFocus() is self.search:
-                event.EventObject.Navigate()
-        elif keycode == wx.WXK_TAB:
-            event.EventObject.Navigate()
-        elif keycode == wx.WXK_ESCAPE:
-            self.on_cancel_or_quit(event)
-        else:
-            event.Skip()
-
-
-    def complain_incomplete_values(self, event):
-        dialog = wx.MessageDialog(self, caption = "Missing search and/or output",
-                                  message = "Incomplete values – do you want to quit?",
-                                  style = wx.YES_NO | wx.ICON_WARNING,
-                                  pos = wx.DefaultPosition)
-        response = dialog.ShowModal()
-        dialog.EndModal(wx.OK)
-        dialog.Destroy()
-        if (response == wx.ID_YES):
-            self._cancel = True
-            self.return_values()
+            if __debug__: log('file path from user: {}', file_path)
+        return_queue.put(file_path)
