@@ -24,7 +24,7 @@ from .debug import log
 from .exceptions import *
 from .files import readable, writable, file_in_use, rename_existing
 from .network import network_available
-from .tind import Tind
+from .tind import Tind, TindRecord
 
 
 # Global constants.
@@ -161,8 +161,18 @@ class MainBody(Thread):
         notifier.info('Writing file {}', outfile)
         with open(outfile, 'w') as f:
             writer = csv.writer(f, delimiter = ',')
+            writer.writerow(self._column_titles_list())
             for rec in records:
                 writer.writerow(self._row_for_record(rec))
+
+
+    def _column_titles_list(self):
+        # Need to be careful to put them in the order that is defined by the
+        # values in _COL_INDEX.  Don't just do a simple list comprehension.
+        titles_list = ['']*len(_COL_INDEX)
+        for field in _COL_INDEX.keys():
+            titles_list[_COL_INDEX[field]] = TindRecord.field_title(field)
+        return titles_list
 
 
     def _row_for_record(self, record):
