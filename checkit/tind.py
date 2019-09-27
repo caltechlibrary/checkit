@@ -46,6 +46,32 @@ _SSO_URL = 'https://idp.caltech.edu/idp/profile/SAML2/Redirect/SSO'
 Root URL for the Caltech SAML steps.
 '''
 
+_ATTRIBUTE_TITLES = {
+    'item_title'         : 'Title',
+    'item_author'        : 'Author',
+    'item_type'          : 'Item type',
+    'item_call_number'   : 'Call number',
+    'item_copy_number'   : 'Copy number',
+    'item_tind_id'       : 'TIND id',
+    'item_barcode'       : 'Barcode',
+    'item_details_url'   : 'Details page',
+    'item_record_url'    : 'Item record page',
+    'item_location_name' : 'Location name',
+    'item_location_code' : 'Location code',
+    'item_holds_count'   : 'Hold requests',
+    'item_loan_status'   : 'Loan status',
+    'item_loan_period'   : 'Loan period',
+    'date_created'       : 'Date created',
+    'date_modified'      : 'Date modified',
+    'requester_name'     : 'Requester name',
+    'requester_email'    : 'Requester email',
+    'requester_type'     : 'Patron type',
+    'requester_url'      : 'Requester details page',
+    'date_requested'     : 'Date requested',
+}
+'''Mapping of Python record object attributes to human-readable short
+descriptive titles for the attributes.  This is used for things like writing
+spreadsheet column titles.'''
 
 
 # Class definitions.
@@ -268,6 +294,14 @@ class TindRecord(BaseRecord):
             self._requester_type = personal_table_rows[8].find('td').get_text()
 
 
+    @classmethod
+    def field_title(cls, name):
+        '''Given the name of a field, return a short human-readable title that
+        describes its meaning.'''
+        if name in _ATTRIBUTE_TITLES:
+            return _ATTRIBUTE_TITLES[name]
+
+
 class Tind(object):
     '''Class to interface to TIND.io.'''
 
@@ -425,8 +459,10 @@ class Tind(object):
         # since if you're telling it to order the output by a given column,
         # the column needs to be identified.
         #
-        # To limit the number of results received, set the value of the field
-        # named 'length'.  For the purposes below, we want all the results.
+        # The 'length' field needs to be set to something, because otherwise
+        # it defaults to 25.  It turns out you can set it to a higher number
+        # than the number of items in the actual search result, and it will
+        # return only the number found.
 
         if len(barcode_list) > 1:
             search_expr = '(' + ' OR '.join(barcode_list) + ')'
@@ -441,6 +477,7 @@ class Tind(object):
                 'order': [{'column': 0, 'dir': 'asc'}],
                 'search': {'regex': False,
                            'value': 'barcode:' + search_expr},
+                'length': 1000,
                 'draw': 1,
                 'start': 0,
                 'table_name': 'crcITEM'}
