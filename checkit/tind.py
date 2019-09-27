@@ -60,8 +60,9 @@ class TindRecord(BaseRecord):
         '''
         super().__init__()
 
-        # We get certain attributes on demand.  Setting them initially to None
-        # (as opposed to '') is the marker it hasn't been set.
+        # We add some additional attributes on demand.  They're obtained via
+        # HTML scraping of TIND pages.  Setting a field here initially to None
+        # (as opposed to '') is used as a marker that it hasn't been set.
         self.requester_name  = None
         self.requester_email = None
         self.requester_type  = None
@@ -98,13 +99,16 @@ class TindRecord(BaseRecord):
             self.item_author = first_author(author_text)
 
         self.item_call_number   = json_dict['call_no']
+        self.item_copy_number   = json_dict['description']
         self.item_location_name = json_dict['location_name']
         self.item_location_code = json_dict['location_code']
         self.item_loan_status   = json_dict['status']
+        self.item_loan_period   = json_dict['loan_period']
         self.item_tind_id       = json_dict['id_bibrec']
         self.item_barcode       = json_dict['barcode']
         self.item_type          = json_dict['item_type']
         self.holds_count        = json_dict['number_of_requests']
+        self.date_created       = json_dict['creation_date']
         self.date_modified      = json_dict['modification_date']
 
         links                   = json_dict['links']
@@ -174,6 +178,16 @@ class TindRecord(BaseRecord):
     @date_requested.setter
     def date_requested(self, value):
         self._date_requested = value
+
+
+    def as_string(self):
+        attr_value_pairs = []
+        for attr in dir(self):
+            if attr.startswith('item_') or attr.startswith('date_'):
+                attr_value_pairs.append(attr + '="' + str(getattr(self, attr)) + '"')
+        c_name = self.__class__.__name__
+        this_id = str(self.item_tind_id)
+        return '<{} {} {}>'.format(c_name, this_id, ' '.join(attr_value_pairs))
 
 
     def _fill_requester_info(self):
