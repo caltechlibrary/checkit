@@ -1,12 +1,24 @@
+'''
+main_body.py: main body logic for this application
+
+Authors
+-------
+
+Michael Hucka <mhucka@caltech.edu> -- Caltech Library
+
+Copyright
+---------
+
+Copyright (c) 2018-2019 by the California Institute of Technology.  This code
+is open-source software released under a 3-clause BSD license.  Please see the
+file "LICENSE" for more information.
+'''
+
 import csv
 import os
 import os.path as path
 import sys
 from   threading import Thread
-
-from   pubsub import pub
-import wx
-
 
 from .debug import log
 from .exceptions import *
@@ -14,6 +26,28 @@ from .files import readable, writable, file_in_use, rename_existing
 from .network import network_available
 from .tind import Tind
 
+
+# Global constants.
+# .............................................................................
+
+# This maps record fields to the columns we want to put them in the output CSV.
+# If the field is not listed here, it's not written out
+
+_COL_INDEX = {
+    'item_barcode'         : 0,
+    'item_title'           : 1,
+    'item_loan_status'     : 2,
+    'item_call_number'     : 3,
+    'item_copy_number'     : 4,
+    'item_location_name'   : 5,
+    'item_tind_id'         : 6,
+    'item_type'            : 7,
+    'item_location_code'   : 8,
+}
+
+
+# Class definitions.
+# .............................................................................
 
 class MainBody(Thread):
     '''Main body of Check It! implemented as a Python thread.'''
@@ -51,7 +85,7 @@ class MainBody(Thread):
         # to interpret, and force the controller to quit.
         try:
             notifier.info('Welcome to ' + controller.app_name)
-            self._run()
+            self._do_main_work()
             notifier.info('Done.')
         except Exception as ex:
             if __debug__: log('exception in main body')
@@ -66,7 +100,7 @@ class MainBody(Thread):
         pass
 
 
-    def _run(self):
+    def _do_main_work(self):
         # Set shortcut variables for better code readability below.
         infile     = self._infile
         outfile    = self._outfile
@@ -76,7 +110,7 @@ class MainBody(Thread):
 
         # Do basic sanity checks ----------------------------------------------
 
-        self._notifier.info('Performing initial checks')
+        self._notifier.info('Doing initial checks')
         if not network_available():
             self._notifier.fatal('No network connection.')
 
@@ -124,8 +158,15 @@ class MainBody(Thread):
         if not outfile.endswith('.csv'):
             outfile += '.csv'
 
-        import pdb; pdb.set_trace()
-        with open(outfile, 'wb') as f:
+        notifier.info('Writing file {}', outfile)
+        with open(outfile, 'w') as f:
             writer = csv.writer(f, delimiter = ',')
             for rec in records:
-                writer.writerow(...)
+                writer.writerow(self._row_for_record(rec))
+
+
+    def _row_for_record(self, record):
+        row = ['']*len(_COL_INDEX)
+        for field in _COL_INDEX.keys():
+            row[_COL_INDEX[field]] = getattr(record, field)
+        return row
