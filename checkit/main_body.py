@@ -35,14 +35,13 @@ from .tind import Tind, TindRecord
 
 _COL_INDEX = {
     'item_barcode'         : 0,
-    'item_title'           : 1,
-    'item_loan_status'     : 2,
-    'item_call_number'     : 3,
-    'item_copy_number'     : 4,
-    'item_location_name'   : 5,
-    'item_tind_id'         : 6,
-    'item_type'            : 7,
-    'item_location_code'   : 8,
+    'item_loan_status'     : 1,
+    'item_call_number'     : 2,
+    'item_copy_number'     : 3,
+    'item_location_name'   : 4,
+    'item_tind_id'         : 5,
+    'item_type'            : 6,
+    'item_location_code'   : 7,
 }
 
 
