@@ -296,6 +296,7 @@ class MainFrame(wx.Frame):
         self.Centre()
 
         # Finally, hook in message-passing interface.
+        pub.subscribe(self.login_dialog, "login_dialog")
         pub.subscribe(self.info_message, "info_message")
         pub.subscribe(self.open_file, "open_file")
         pub.subscribe(self.save_file, "save_file")
@@ -391,3 +392,218 @@ class MainFrame(wx.Frame):
         else:
             if __debug__: log('file path from user: {}', file_path)
         return_queue.put(file_path)
+
+
+    def login_dialog(self, results, user, password):
+        if __debug__: log('creating and showing login dialog')
+        dialog = LoginDialog(self, self._name)
+        dialog.initialize_values(results, user, password)
+        dialog.ShowWindowModal()
+
+
+class LoginDialog(wx.Dialog):
+    '''Defines the modal dialog used for getting the user's login credentials.'''
+
+    def __init__(self, parent, app_name):
+        super(LoginDialog, self).__init__(parent)
+        self._name = app_name
+        self._user = None
+        self._password = None
+        self._cancel = False
+        self._wait_queue = None
+
+        panel = wx.Panel(self)
+        if sys.platform.startswith('win'):
+            self.SetSize((330, 175))
+        else:
+            self.SetSize((330, 155))
+        self.explanation = wx.StaticText(panel, wx.ID_ANY,
+                                         self._name + ' needs your Caltech Access credentials',
+                                         style = wx.ALIGN_CENTER)
+        self.top_line = wx.StaticLine(panel, wx.ID_ANY)
+        self.login_label = wx.StaticText(panel, wx.ID_ANY, "Caltech login: ", style = wx.ALIGN_RIGHT)
+        self.login = wx.TextCtrl(panel, wx.ID_ANY, '', style = wx.TE_PROCESS_ENTER)
+        self.login.Bind(wx.EVT_KEY_DOWN, self.on_enter_or_tab)
+        self.login.Bind(wx.EVT_TEXT, self.on_text)
+        self.password_label = wx.StaticText(panel, wx.ID_ANY, "Caltech password: ", style = wx.ALIGN_RIGHT)
+        self.password = wx.TextCtrl(panel, wx.ID_ANY, '', style = wx.TE_PASSWORD)
+        self.password.Bind(wx.EVT_KEY_DOWN, self.on_enter_or_tab)
+        self.password.Bind(wx.EVT_TEXT, self.on_text)
+        self.bottom_line = wx.StaticLine(panel, wx.ID_ANY)
+        self.cancel_button = wx.Button(panel, wx.ID_ANY, "Cancel")
+        self.cancel_button.Bind(wx.EVT_KEY_DOWN, self.on_escape)
+        self.ok_button = wx.Button(panel, wx.ID_ANY, "OK")
+        self.ok_button.Bind(wx.EVT_KEY_DOWN, self.on_ok_enter_key)
+        self.ok_button.SetDefault()
+        self.ok_button.Disable()
+
+        # Put everything together and bind some keystrokes to events.
+        self.__set_properties()
+        self.__do_layout()
+        self.Bind(wx.EVT_BUTTON, self.on_cancel_or_quit, self.cancel_button)
+        self.Bind(wx.EVT_BUTTON, self.on_ok, self.ok_button)
+        self.Bind(wx.EVT_CLOSE, self.on_cancel_or_quit)
+
+        close_id = wx.NewId()
+        self.Bind(wx.EVT_MENU, self.on_cancel_or_quit, id = close_id)
+        accel_tbl = wx.AcceleratorTable([
+            (wx.ACCEL_CTRL, ord('W'), close_id ),
+            (wx.ACCEL_CMD, ord('.'), close_id ),
+        ])
+        self.SetAcceleratorTable(accel_tbl)
+
+
+    def __set_properties(self):
+        self.SetTitle(self._name)
+        self.login_label.SetToolTip("The account name to use to log in to caltech.tind.io. This should be a Caltech access login name.")
+        self.login.SetMinSize((195, 22))
+        self.password_label.SetToolTip("The account password to use to log in to caltech.tind.io. This should be a Caltech access password.")
+        self.password.SetMinSize((195, 22))
+        self.ok_button.SetFocus()
+
+
+    def __do_layout(self):
+        self.outermost_sizer = wx.BoxSizer(wx.VERTICAL)
+        self.button_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.login_sizer = wx.FlexGridSizer(2, 2, 5, 0)
+        self.outermost_sizer.Add((360, 5), 0, wx.ALIGN_CENTER, 0)
+        self.outermost_sizer.Add(self.explanation, 0, wx.ALIGN_CENTER, 0)
+        self.outermost_sizer.Add((360, 5), 0, wx.ALIGN_CENTER, 0)
+        self.outermost_sizer.Add(self.top_line, 0, wx.EXPAND | wx.ALIGN_CENTER_VERTICAL, 0)
+        self.outermost_sizer.Add((360, 8), 0, wx.ALIGN_CENTER, 0)
+        self.login_sizer.Add(self.login_label, 0, wx.ALIGN_RIGHT, 0)
+        self.login_sizer.Add(self.login, 0, wx.EXPAND, 0)
+        self.login_sizer.Add(self.password_label, 0, wx.ALIGN_RIGHT, 0)
+        self.login_sizer.Add(self.password, 0, wx.EXPAND, 0)
+        self.outermost_sizer.Add(self.login_sizer, 1, wx.ALIGN_CENTER | wx.FIXED_MINSIZE, 5)
+        self.outermost_sizer.Add((360, 5), 0, 0, 0)
+        self.outermost_sizer.Add(self.bottom_line, 0, wx.EXPAND | wx.ALIGN_CENTER_VERTICAL, 0)
+        self.outermost_sizer.Add((360, 5), 0, 0, 0)
+        self.button_sizer.Add((0, 0), 0, 0, 0)
+        self.button_sizer.Add(self.cancel_button, 0, wx.ALIGN_CENTER, 0)
+        self.button_sizer.Add((10, 20), 0, 0, 0)
+        self.button_sizer.Add(self.ok_button, 0, wx.ALIGN_CENTER, 0)
+        self.button_sizer.Add((10, 20), 0, wx.ALIGN_CENTER, 0)
+        self.outermost_sizer.Add(self.button_sizer, 1, wx.ALIGN_RIGHT, 0)
+        self.outermost_sizer.Add((360, 5), 0, wx.ALIGN_CENTER, 0)
+        self.SetSizer(self.outermost_sizer)
+        self.Layout()
+        self.Centre()
+
+
+    def initialize_values(self, wait_queue, user, password):
+        '''Initializes values used to populate the dialog and communicate
+        with calling code.
+
+        'wait_queue' must be a Pytho queue.Queue() object.  Callers must
+        create the queue object and pass it to this function.  After creating
+        and displaying the dialog, callers can use .get() on the queue object
+        to wait until the user has either clicked OK or Cancel in the dialog.
+
+        'user' and 'password' are used to populate the credentials form in
+        case there are preexisting values to be used as defaults.'''
+
+        self._wait_queue = wait_queue
+        self._user = user
+        self._password = password
+        if self._user:
+            self.login.AppendText(self._user)
+            self.login.Refresh()
+        if self._password:
+            self.password.AppendText(self._password)
+            self.password.Refresh()
+
+
+    def return_values(self):
+        if __debug__: log('return_values called')
+        self._wait_queue.put((self._user, self._password, self._cancel))
+
+
+    def inputs_nonempty(self):
+        user = self.login.GetValue()
+        password = self.password.GetValue()
+        if user.strip() and password.strip():
+            return True
+        return False
+
+
+    def on_ok(self, event):
+        '''Stores the current values and destroys the dialog.'''
+
+        if __debug__: log('got OK')
+        if self.inputs_nonempty():
+            self._cancel = False
+            self._user = self.login.GetValue()
+            self._password = self.password.GetValue()
+            self.return_values()
+            # self.Destroy()
+            self.return_values()
+            self.EndModal(event.EventObject.Id)
+        else:
+            if __debug__: log('has incomplete inputs')
+            self.complain_incomplete_values(event)
+
+
+    def on_cancel_or_quit(self, event):
+        if __debug__: log('got Cancel')
+        self._cancel = True
+        self.return_values()
+        # self.Destroy()
+        self.return_values()
+        self.EndModal(event.EventObject.Id)
+
+
+    def on_text(self, event):
+        if self.login.GetValue() and self.password.GetValue():
+            self.ok_button.Enable()
+        else:
+            self.ok_button.Disable()
+
+
+    def on_escape(self, event):
+        keycode = event.GetKeyCode()
+        if keycode == wx.WXK_ESCAPE:
+            if __debug__: log('got Escape')
+            self.on_cancel_or_quit(event)
+        else:
+            event.Skip()
+
+
+    def on_ok_enter_key(self, event):
+        keycode = event.GetKeyCode()
+        if keycode in [wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER, wx.WXK_SPACE]:
+            self.on_ok(event)
+        elif keycode == wx.WXK_ESCAPE:
+            self.on_cancel_or_quit(event)
+        else:
+            event.EventObject.Navigate()
+
+
+    def on_enter_or_tab(self, event):
+        keycode = event.GetKeyCode()
+        if keycode in [wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER]:
+            # If the ok button is enabled, we interpret return/enter as "done".
+            if self.ok_button.IsEnabled():
+                self.on_ok(event)
+            # If focus is on the login line, move to password.
+            if wx.Window.FindFocus() is self.login:
+                event.EventObject.Navigate()
+        elif keycode == wx.WXK_TAB:
+            event.EventObject.Navigate()
+        elif keycode == wx.WXK_ESCAPE:
+            self.on_cancel_or_quit(event)
+        else:
+            event.Skip()
+
+
+    def complain_incomplete_values(self, event):
+        dialog = wx.MessageDialog(self, caption = "Missing login and/or password",
+                                  message = "Incomplete values – do you want to quit?",
+                                  style = wx.YES_NO | wx.ICON_WARNING,
+                                  pos = wx.DefaultPosition)
+        response = dialog.ShowModal()
+        dialog.EndModal(wx.OK)
+        dialog.Destroy()
+        if (response == wx.ID_YES):
+            self._cancel = True
+            self.return_values()
