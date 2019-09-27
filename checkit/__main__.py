@@ -90,22 +90,22 @@ def main(no_color = False, no_gui = False, input_csv = 'I', no_keyring = False,
         body = MainBody(infile, outfile, controller, accessor, notifier)
         controller.run(body)
         exception = body.exception
-    except (KeyboardInterrupt, UserCancelled) as ex:
-        if __debug__: log('received {}', ex.__class__.__name__)
     except Exception as ex:
         # MainBody exceptions are caught in the thread, so this is something else.
         exception = sys.exc_info()
 
     # Common exception handling regardless of whether they came from.
-    if exception:
+    if exception and type(exception[1]) in [KeyboardInterrupt, UserCancelled]:
+        if __debug__: log('received {}', exception[1].__class__.__name__)
+    elif exception:
         from traceback import format_exception
-        error = str(exception[1])
+        ex_type = str(exception[1])
         details = ''.join(format_exception(*exception))
-        if __debug__: log('Exception: {}\n{}', error, details)
+        if __debug__: log('Exception: {}\n{}', ex_type, details)
         if debugging:
             import pdb; pdb.set_trace()
         if notifier:
-            notifier.fatal('Encountered an error: {}', error, details = details)
+            notifier.fatal('Encountered an error: {}', ex_type, details = details)
         if controller:
             controller.quit()
 
