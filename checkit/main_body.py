@@ -130,7 +130,7 @@ class MainBody(Thread):
         notifier.info('Reading file {}', infile)
         barcode_list = []
         with open(infile, mode="r") as f:
-            barcode_list = [row[0] for row in csv.reader(f)]
+            barcode_list = [row[0] for row in csv.reader(f) if row]
 
         tind = Tind(accessor, notifier)
         records = tind.records(barcode_list)
