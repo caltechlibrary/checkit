@@ -12,6 +12,7 @@ from .debug import log
 from .exceptions import *
 from .files import readable, writable, file_in_use, rename_existing
 from .network import network_available
+from .tind import Tind
 
 
 class MainBody(Thread):
@@ -69,6 +70,7 @@ class MainBody(Thread):
         # Set shortcut variables for better code readability below.
         infile     = self._infile
         outfile    = self._outfile
+        accessor   = self._accessor
         controller = self._controller
         notifier   = self._notifier
 
@@ -78,7 +80,7 @@ class MainBody(Thread):
         if not network_available():
             self._notifier.fatal('No network connection.')
 
-        # Get input and output files ------------------------------------------
+        # Get input file ------------------------------------------
 
         if not infile and controller.is_gui:
             notifier.info('Asking user for input file')
@@ -89,6 +91,18 @@ class MainBody(Thread):
         if not readable(infile):
             notifier.error('Cannot read file: {}'.format(infile))
             return
+
+        # Read the input file and query TIND ----------------------------------
+
+        notifier.info('Reading file {}', infile)
+        barcode_list = []
+        with open(infile, mode="r") as f:
+            barcode_list = [row[0] for row in csv.reader(f)]
+
+        tind = Tind(accessor, notifier)
+        records = tind.records(barcode_list)
+
+        # Write the output ----------------------------------------------------
 
         if not outfile and controller.is_gui:
             notifier.info('Asking user for output file')
@@ -110,9 +124,8 @@ class MainBody(Thread):
         if not outfile.endswith('.csv'):
             outfile += '.csv'
 
-        # Read the input file and query TIND ----------------------------------
-
-        notifier.info('Reading file {}', infile)
-        barcode_list = []
-        with open(infile, mode="r") as f:
-            barcode_list = [row[0] for row in csv.reader(f)]
+        import pdb; pdb.set_trace()
+        with open(outfile, 'wb') as f:
+            writer = csv.writer(f, delimiter = ',')
+            for rec in records:
+                writer.writerow(...)
