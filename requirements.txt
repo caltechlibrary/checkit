@@ -1,0 +1,12 @@
+beautifulsoup4=>4.8.0
+colorful=>0.5.3
+iteration_utilities=>0.7.0
+keyring=>19.0.2
+lxml=>4.4.1
+nameparser=>1.0.4
+plac=>1.1.0
+Pypubsub>=4.0.0
+requests=>2.22.0
+setuptools=>41.0.1
+urllib3=>1.25.3
+wxPython=>4.0.6
