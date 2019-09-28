@@ -14,6 +14,7 @@ is open-source software released under a 3-clause BSD license.  Please see the
 file "LICENSE" for more information.
 '''
 
+from   iteration_utilities import grouper
 import json
 from   nameparser import HumanName
 import re
@@ -317,12 +318,12 @@ class Tind(object):
         if not json_data:
             if __debug__: log('no data received from tind')
             return []
-        num_records = len(json_data['data'])
+        num_records = len(json_data)
         if num_records < 1:
             if __debug__: log('record list from tind is empty')
             return []
         if __debug__: log('got {} records from tind.io', num_records)
-        return [TindRecord(r, self, session) for r in json_data['data']]
+        return [TindRecord(r, self, session) for r in json_data]
 
 
     def _tind_session(self):
@@ -418,21 +419,20 @@ class Tind(object):
     def _tind_json(self, session, barcode_list):
         '''Return the data from using AJAX to search tind.io's global lists.'''
 
-        # The session object has Invenio session cookies and Shibboleth IDP
-        # session data.  Now we have to invoke the Ajax call that would be
-        # triggered by typing in the search box and clicking "Search" at
-        # https://caltech.tind.io/lists/.  To figure out the parameters and
-        # data needed, I used the data inspectors in a browser to look at the
-        # JS script libraries loaded by the page, especially globaleditor.js,
-        # to find the Ajax invocation code and figure out the URL.
+        # Trial and error testing revealed that if the "OR" expression has
+        # more than about 1024 barcodes, TIND returns http code 400.  So, we
+        # break up our search into chunks of 1000 (a nice round number).
+        self._notifier.info('Asking TIND for records')
+        data = []
+        for codes in grouper(barcode_list, 1000):
+            search_expr = codes[0] if len(codes) == 1 else '(' + ' OR '.join(codes) + ')'
+            payload = self._tind_ajax_payload('barcode', search_expr)
+            data += self._tind_ajax(session, payload)
+        self._notifier.info('Received {} records from TIND', len(data))
+        return data
 
-        ajax_url     = 'https://caltech.tind.io/lists/dt_api'
-        ajax_headers = {'X-Requested-With' : 'XMLHttpRequest',
-                        "Content-Type"     : "application/json",
-                        'User-Agent'       : _USER_AGENT_STRING}
 
-        # Note: this initial value of the data payload is changed further below.
-        #
+    def _tind_ajax_payload(self, field, search_expr):
         # About the fields in 'data': I found the value of the payload data
         # by the following procedure:
         #
@@ -454,52 +454,39 @@ class Tind(object):
         #
         # The value you get back will have a field named 'columns' with a
         # very long list of items in it.  By trial and error, I discovered
-        # you don't need to leave all of them in the list: you only need as
-        # many as you use in the 'order' directive -- which makes sense,
-        # since if you're telling it to order the output by a given column,
-        # the column needs to be identified.
+        # you don't need to use all of them in the list submitted as the data
+        # in the ajax call: you only need as many as you use in the 'order'
+        # directive -- which makes sense, since if you're telling it to order
+        # the output by a given column, the column needs to be identified.
         #
         # The 'length' field needs to be set to something, because otherwise
         # it defaults to 25.  It turns out you can set it to a higher number
         # than the number of items in the actual search result, and it will
         # return only the number found.
 
-        if len(barcode_list) > 1:
-            search_expr = '(' + ' OR '.join(barcode_list) + ')'
-        else:
-            search_expr = barcode_list[0]
-
-        data = {'columns': [{'data': 'barcode',
-                             'name': 'barcode',
-                             'searchable': True,
-                             'orderable': True,
+        return {'columns': [{'data': field, 'name': field,
+                             'searchable': True, 'orderable': True,
                              'search': {'value': '', 'regex': False}}],
                 'order': [{'column': 0, 'dir': 'asc'}],
-                'search': {'regex': False,
-                           'value': 'barcode:' + search_expr},
-                'length': 1000,
-                'draw': 1,
-                'start': 0,
-                'table_name': 'crcITEM'}
-
-        self._notifier.info('Asking TIND for records')
-        results = self._tind_ajax(session, ajax_url, ajax_headers, data)
-        total_records = results['recordsTotal']
-        if __debug__: log('TIND says there are {} records', total_records)
-        if len(results['data']) != total_records:
-            details = 'Expected {} records but received {}'.format(
-                total_records, len(results['data']))
-            self._notifier.fatal('TIND returned unexpected number of items',
-                                 details = details)
-            raise ServiceFailure('TIND returned unexpected number of items')
-        self._notifier.info('Received {} records from TIND', total_records)
-        return results
+                'search': {'regex': False, 'value': field + ':' + search_expr},
+                'length': 1000, 'draw': 1, 'start': 0, 'table_name': 'crcITEM'}
 
 
-    def _tind_ajax(self, session, ajax_url, ajax_headers, data):
+    def _tind_ajax(self, session, payload):
+        # The session object has Invenio session cookies and Shibboleth IDP
+        # session data.  Now we have to invoke the Ajax call that would be
+        # triggered by typing in the search box and clicking "Search" at
+        # https://caltech.tind.io/lists/.  To figure out the parameters and
+        # data needed, I used the data inspectors in a browser to look at the
+        # JS script libraries loaded by the page, especially globaleditor.js,
+        # to find the Ajax invocation code and figure out the URL.
+        ajax_url     = 'https://caltech.tind.io/lists/dt_api'
+        ajax_headers = {'X-Requested-With' : 'XMLHttpRequest',
+                        "Content-Type"     : "application/json",
+                        'User-Agent'       : _USER_AGENT_STRING}
         try:
             if __debug__: log('posting ajax call to tind.io')
-            resp = session.post(ajax_url, headers = ajax_headers, json = data)
+            resp = session.post(ajax_url, headers = ajax_headers, json = payload)
         except Exception as err:
             details = 'exception doing AJAX call {}'.format(err)
             self._notifier.fatal('Unable to get data from TIND', details)
@@ -509,11 +496,19 @@ class Tind(object):
             self._notifier.fatal('TIND failed to return data', details)
             raise ServiceFailure(details)
         results = resp.json()
-        if 'recordsTotal' not in results:
+        if 'recordsTotal' not in results or 'data' not in results:
             self._notifier.fatal('Unexpected result from TIND AJAX call')
             raise InternalError('Unexpected result from TIND AJAX call')
+        total_records = results['recordsTotal']
+        if __debug__: log('TIND says there are {} records', total_records)
+        if len(results['data']) != total_records:
+            details = 'Expected {} records but received {}'.format(
+                total_records, len(results['data']))
+            self._notifier.fatal('TIND returned unexpected number of items',
+                                 details = details)
+            raise ServiceFailure('TIND returned unexpected number of items')
         if __debug__: log('succeeded in getting data via ajax')
-        return results
+        return results['data']
 
 
     def loan_details(self, tind_id, session):
