@@ -158,11 +158,16 @@ class MainBody(Thread):
             outfile += '.csv'
 
         notifier.info('Writing file {}', outfile)
+        found_barcodes = [r.item_barcode for r in records]
         with open(outfile, 'w') as f:
             writer = csv.writer(f, delimiter = ',')
             writer.writerow(self._column_titles_list())
             for rec in records:
                 writer.writerow(self._row_for_record(rec))
+            # Write markers for barcodes not returned by TIND.
+            missing = [x for x in barcode_list if x not in found_barcodes]
+            for barcode in missing:
+                writer.writerow(self._blank_row_for_barcode(barcode))
 
 
     def _column_titles_list(self):
@@ -178,4 +183,9 @@ class MainBody(Thread):
         row = ['']*len(_COL_INDEX)
         for field in _COL_INDEX.keys():
             row[_COL_INDEX[field]] = getattr(record, field)
+        return row
+
+
+    def _blank_row_for_barcode(self, barcode):
+        row = [barcode] + ['n/a']*(len(_COL_INDEX) - 1)
         return row
