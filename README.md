@@ -24,7 +24,7 @@ Table of contents
 Introduction
 ------------
 
-_todo_
+Caltech Librarians need to identify what is and is not on the shelves of the library stacks.  One of the processes currently being used is to scan the barcodes of items on the shelves and compare the results to what is expected, based on the library's information management system.  Check It! is a program to take a list of barcodes and create a spreadsheet of information about the items determined from Caltech.tind.io.
 
 
 Installation
