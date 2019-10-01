@@ -124,13 +124,17 @@ class MainBody(Thread):
         if not readable(infile):
             notifier.alert('Cannot read file: {}'.format(infile))
             return
+        if not self._file_contains_barcodes(infile):
+            details = 'File does not appear to contain barcodes: {}'.format(infile)
+            notifier.alert('Bad input file', details = details)
+            return
 
         # Read the input file and query TIND ----------------------------------
 
         notifier.inform('Reading file {}', infile)
         barcode_list = []
         with open(infile, mode="r") as f:
-            barcode_list = [row[0] for row in csv.reader(f) if row]
+            barcode_list = [row[0] for row in csv.reader(f) if row and row[0].isdigit()]
 
         tind = Tind(accessor, notifier)
         records = tind.records(barcode_list)
@@ -189,3 +193,12 @@ class MainBody(Thread):
     def _blank_row_for_barcode(self, barcode):
         row = [barcode] + ['n/a']*(len(_COL_INDEX) - 1)
         return row
+
+
+    def _file_contains_barcodes(self, input_file):
+        with open(input_file, 'r') as f:
+            line = f.readline().strip().strip(',')
+            # First line of a CSV file might be column headers, so skip it.
+            if not line.isdigit() and not line.startswith('nobarcode'):
+                line = f.readline().strip().strip(',')
+            return line.isdigit() or line.startswith('nobarcode')
