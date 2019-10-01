@@ -4,7 +4,7 @@ Check It!<img width="14%" align="right" src=".graphics/checkit-icon.svg">
 _Check It!_ is a program to help Caltech Librarians perform inventory.  It takes a list of bar codes and generates a CSV file containing information about the items drawn from Caltech's TIND server.
 
 [![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg?style=flat-square)](https://choosealicense.com/licenses/bsd-3-clause)
-[![Python](https://img.shields.io/badge/Python-3.5+-brightgreen.svg?style=flat-square)](https://www.python.org/downloads/release/python-350/)
+[![Python](https://img.shields.io/badge/Python-3.6+-brightgreen.svg?style=flat-square)](https://www.python.org/downloads/release/python-360/)
 [![Latest release](https://img.shields.io/github/v/release/caltechlibrary/checkit.svg?style=flat-square&color=b44e88)](https://github.com/caltechlibrary/checkit/releases)
 
 
