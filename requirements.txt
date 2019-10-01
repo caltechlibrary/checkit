@@ -6,6 +6,7 @@ keyring>=19.0.2
 lxml>=4.4.1
 nameparser>=1.0.4
 plac>=1.1.0
+PyInstaller>=3.5.0
 Pypubsub>=4.0.0
 requests>=2.22.0
 setuptools>=41.0.1
