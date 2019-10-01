@@ -1,5 +1,6 @@
 beautifulsoup4>=4.8.0
 colorful>=0.5.3
+distro>=1.4.0
 iteration_utilities>=0.7.0
 keyring>=19.0.2
 lxml>=4.4.1
