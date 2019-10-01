@@ -48,24 +48,24 @@ class MessageHandlerBase():
 
 
     def info_text(self, text, *args):
-        '''Prints an informational message.'''
+        '''Return an informational message.'''
         return styled(text.format(*args), 'info', self._colorize)
 
 
-    def warn_text(self, text, *args):
-        '''Prints a nonfatal, noncritical warning message.'''
+    def warning_text(self, text, *args):
+        '''Return a nonfatal, noncritical warning message.'''
         return styled(text.format(*args), 'warn', self._colorize)
 
 
     def error_text(self, text, *args):
-        '''Prints a message reporting a critical error.'''
+        '''Return a message reporting an error.'''
         return styled(text.format(*args), 'error', self._colorize)
 
 
     def fatal_text(self, text, *args):
-        '''Prints a message reporting a fatal error.  This method does not
-        exit the program; it leaves that to the caller in case the caller
-        needs to perform additional tasks before exiting.
+        '''Return a message reporting a fatal error.  Note that this method
+        does not exit the program; it leaves that to the caller in case the
+        caller needs to perform additional tasks before exiting.
         '''
         return styled('FATAL: ' + text.format(*args), ['error', 'bold'], self._colorize)
 
@@ -87,36 +87,36 @@ class MessageHandlerCLI(MessageHandlerBase):
         return self._quiet
 
 
-    def info(self, text, *args):
-        '''Prints an informational message.'''
+    def inform(self, text, *args):
+        '''Print an informational message.'''
         if __debug__: log(text, *args)
         if not self._quiet:
             print(self.info_text(text, *args), flush = True)
 
 
     def warn(self, text, *args):
-        '''Prints a nonfatal, noncritical warning message.'''
+        '''Print a nonfatal, noncritical warning message.'''
         if __debug__: log(text, *args)
-        print(self.warn_text(text, *args), flush = True)
+        print(self.warning_text(text, *args), flush = True)
 
 
-    def error(self, text, *args):
-        '''Prints a message reporting a critical error.'''
+    def alert(self, text, *args):
+        '''Print a message reporting an error.'''
         if __debug__: log(text, *args)
         print(self.error_text(text, *args), flush = True)
 
 
-    def fatal(self, text, *args, **kwargs):
-        '''Prints a message reporting a fatal error.  This method does not
-        exit the program; it leaves that to the caller in case the caller
-        needs to perform additional tasks before exiting.
+    def alert_fatal(self, text, *args, **kwargs):
+        '''Print a message reporting a fatal error.  Note that this method
+        does not exit the program; it leaves that to the caller in case the
+        caller needs to perform additional tasks before exiting.
         '''
         if __debug__: log(text, *args)
         text += '\n' + kwargs['details'] if 'details' in kwargs else ''
         print(self.fatal_text(text, *args), flush = True)
 
 
-    def yes_no(self, question):
+    def ask_yes_no(self, question):
         '''Asks a yes/no question of the user, on the command line.'''
         return input("{} (y/n) ".format(question)).startswith(('y', 'Y'))
 
@@ -130,21 +130,21 @@ class MessageHandlerGUI(MessageHandlerBase):
         self._response = None
 
 
-    def info(self, text, *args):
-        '''Prints an informational message.'''
+    def inform(self, text, *args):
+        '''Print an informational message.'''
         if __debug__: log('generating info notice')
         wx.CallAfter(pub.sendMessage, "info_message", message = text.format(*args))
 
 
     def warn(self, text, *args):
-        '''Prints a nonfatal, noncritical warning message.'''
+        '''Print a nonfatal, noncritical warning message.'''
         if __debug__: log('generating warning notice')
         wx.CallAfter(pub.sendMessage, "info_message",
                      message = 'Warning: ' + text.format(*args))
 
 
-    def error(self, text, *args, **kwargs):
-        '''Prints a message reporting a critical error.'''
+    def alert(self, text, *args, **kwargs):
+        '''Print a message reporting a critical error.'''
         if __debug__: log('generating error notice')
         message = text.format(*args)
         details = kwargs['details'] if 'details' in kwargs else ''
@@ -156,8 +156,8 @@ class MessageHandlerGUI(MessageHandlerBase):
         self._wait()
 
 
-    def fatal(self, text, *args, **kwargs):
-        '''Prints a message reporting a fatal error.  The keyword argument
+    def alert_fatal(self, text, *args, **kwargs):
+        '''Print a message reporting a fatal error.  The keyword argument
         'details' can be supplied to pass a longer explanation that will be
         displayed if the user presses the 'Help' button in the dialog.
 
@@ -176,10 +176,10 @@ class MessageHandlerGUI(MessageHandlerBase):
         self._wait()
 
 
-    def yes_no(self, question):
+    def ask_yes_no(self, question):
         '''Asks the user a yes/no question using a GUI dialog.'''
         if __debug__: log('generating yes/no dialog')
-        wx.CallAfter(self._yes_no, question)
+        wx.CallAfter(self._ask_yes_no, question)
         self._wait()
         if __debug__: log('got response: {}', self._response)
         return self._response
@@ -238,7 +238,7 @@ class MessageHandlerGUI(MessageHandlerBase):
             self._queue.put(True)
 
 
-    def _yes_no(self, question):
+    def _ask_yes_no(self, question):
         frame = self._current_frame()
         dlg = wx.GenericMessageDialog(frame, question, caption = "Check It!",
                                       style = wx.YES_NO | wx.ICON_QUESTION)
