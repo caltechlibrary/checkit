@@ -14,10 +14,10 @@ app_name    := CheckIt
 
 # Other variables (should not need changing) ----------------------------------
 
-release	   := $(file < VERSION.txt)
+release	   := $(shell grep 'version\s*=' setup.cfg | cut -f2 -d'=' | tr -d '[:blank:]')
 platform   := $(shell python3 -c 'import sys; print(sys.platform)')
-distro	   := $(shell python3 -c 'import platform; print(platform.dist()[0].lower())')
-linux_vers := $(shell python3 -c 'import platform; print(platform.dist()[1].lower())' | cut -f1-2 -d'.')
+distro	   := $(shell python3 -c 'import distro; print(distro.linux_distribution(False)[0])')
+linux_vers := $(shell python3 -c 'import distro; print(distro.linux_distribution(False)[1])' | cut -f1-2 -d'.')
 macos_vers := $(shell sw_vers -productVersion 2>/dev/null | cut -f1-2 -d'.' || true)
 github-css := dev/github-css/github-markdown-css.html
 
@@ -29,10 +29,10 @@ help-file  := $(python_name)/data/help.html
 build: | dependencies data-files build-$(platform)
 
 release:;
-	sed -i .bak -e "/version/ s/[0-9].[0-9].[0-9]/$$(<VERSION.txt)/" codemeta.json
+	sed -i .bak -e "/version/ s/[0-9].[0-9].[0-9]/$(release)/" codemeta.json
 	git add codemeta.json
 	git commit -m"Update version number" codemeta.json
-	git tag -a v$$(<VERSION.txt) -m "Release $$(<VERSION.txt)"
+	git tag -a v$(release) -m "Release $(release)"
 	git push -v --all
 	git push -v --tags
 
