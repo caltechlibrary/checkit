@@ -83,3 +83,5 @@ __pycache__
 checkit.egg-info
 ABOUT.html
 ABOUT.md
+build
+dist
