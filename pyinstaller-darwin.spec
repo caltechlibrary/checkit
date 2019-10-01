@@ -7,21 +7,29 @@
 # @website https://github.com/caltechlibrary/checkit
 # =============================================================================
 
-import imp
-import os
+import importlib
+from   os import path
 import sys
 
-# The list must contain tuples: ('file', 'destination directory').
-data_files = [ ('checkit/checkit.ini', 'checkit'),
-               ('checkit/data/client_secrets.json', 'checkit/data'),
-               ('checkit/data/help.html', 'checkit/data') ]
+# The addition of setup.cfg is so that our __init__.py code can work even
+# when bundled into the PyInstaller-created application.
+data_files = [ ('checkit/data/help.html', 'checkit/data'),
+               ('setup.cfg',              'checkit/data') ]
+
+# The "colorful" package has a data file that doesn't get picked up
+# automatically, so we have to deal with it ourselves.
+
+colorful_package = importlib.import_module('colorful')
+colorful_path = path.dirname(colorful_package.__file__)
+data_files += [(os.path.join(colorful_path, 'data', 'rgb.txt'), 'colorful/data')]
+
+# The rest is pretty normal PyInstaller stuff.
 
 configuration = Analysis(['checkit/__main__.py'],
                          pathex = ['.'],
                          binaries = [],
                          datas = data_files,
-                         hiddenimports = ['apiclient', 'keyring.backends',
-                                          'keyring.backends.OS_X', 'wx._html',
+                         hiddenimports = ['keyring.backends.OS_X', 'wx._html',
                                           'wx._xml'],
                          hookspath = [],
                          runtime_hooks = [],
@@ -55,7 +63,7 @@ executable         = EXE(application_pyz,
 
 app             = BUNDLE(executable,
                          name = 'CheckIt.app',
-                         icon = 'dev/icons/generated-icons/checkit-icon-512px.icns',
+                         icon = 'dev/icons/generated-icons/checkit-icon.icns',
                          bundle_identifier = None,
                          info_plist = {'NSHighResolutionCapable': 'True',
                                        'NSAppleScriptEnabled': False},
