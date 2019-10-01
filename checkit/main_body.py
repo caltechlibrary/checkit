@@ -38,10 +38,10 @@ _COL_INDEX = {
     'item_loan_status'     : 1,
     'item_call_number'     : 2,
     'item_copy_number'     : 3,
-    'item_location_name'   : 4,
-    'item_tind_id'         : 5,
-    'item_type'            : 6,
-    'item_location_code'   : 7,
+    'item_location_code'   : 4,
+    'item_location_name'   : 5,
+    'item_tind_id'         : 6,
+    'item_type'            : 7,
 }
 
 
