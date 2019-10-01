@@ -20,17 +20,22 @@ import sys
 # Set module-level dunder variables like __version__
 # .............................................................................
 # The following code reads from either ../setup.cfg (if running from a source
-# directory) or the installed package metadata, and sets the corresponding
-# module-level variables with '__' surrounding their names.
+# directory) or data/setup.cfg (if running from an application created by
+# PyInstaller using our PyInstaller configuration scheme), or the installed
+# package metadata (if installed normally).  It reads config vars and sets the
+# corresponding module-level variables with '__' surrounding their names.
 
 keys = ['version', 'description', 'license', 'url', 'keywords',
         'author', 'author_email', 'maintainer', 'maintainer_email']
 
 this_module = sys.modules[__package__]
-setup_cfg = path.join(path.dirname(__file__), '..', 'setup.cfg')
+module_path = this_module.__path__[0]
+setup_cfg = path.join(module_path, 'data/setup.cfg')
+if not path.exists(setup_cfg):
+    setup_cfg = path.join(path.dirname(__file__), '..', 'setup.cfg')
 
 if path.exists(setup_cfg):
-    # If we are running from the source directory, we read from setup.cfg.
+    # If setup.cfg is directly available, use that.
     from setuptools.config import read_configuration
     conf_dict = read_configuration(setup_cfg)
     conf = conf_dict['metadata']
