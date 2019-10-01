@@ -83,9 +83,9 @@ class MainBody(Thread):
         # If exceptions occur, we capture the stack context for the caller
         # to interpret, and force the controller to quit.
         try:
-            notifier.info('Welcome to ' + controller.app_name)
+            notifier.inform('Welcome to ' + controller.app_name)
             self._do_main_work()
-            notifier.info('Done.')
+            notifier.inform('Done.')
         except Exception as ex:
             if __debug__: log('exception in main body')
             self.exception = sys.exc_info()
@@ -109,25 +109,25 @@ class MainBody(Thread):
 
         # Do basic sanity checks ----------------------------------------------
 
-        self._notifier.info('Doing initial checks')
+        self._notifier.inform('Doing initial checks')
         if not network_available():
-            self._notifier.fatal('No network connection.')
+            raise NetworkFailure('No network connection.')
 
         # Get input file ------------------------------------------
 
         if not infile and controller.is_gui:
-            notifier.info('Asking user for input file')
+            notifier.inform('Asking user for input file')
             infile = controller.open_file('Open barcode file', 'CSV file|*.csv|Any file|*.*')
         if not infile:
-            notifier.error('No input file')
+            notifier.alert('No input file')
             return
         if not readable(infile):
-            notifier.error('Cannot read file: {}'.format(infile))
+            notifier.alert('Cannot read file: {}'.format(infile))
             return
 
         # Read the input file and query TIND ----------------------------------
 
-        notifier.info('Reading file {}', infile)
+        notifier.inform('Reading file {}', infile)
         barcode_list = []
         with open(infile, mode="r") as f:
             barcode_list = [row[0] for row in csv.reader(f) if row]
@@ -138,26 +138,26 @@ class MainBody(Thread):
         # Write the output ----------------------------------------------------
 
         if not outfile and controller.is_gui:
-            notifier.info('Asking user for output file')
+            notifier.inform('Asking user for output file')
             outfile = controller.save_file('Output destination file')
         if not outfile:
-            notifier.error('No output file specified')
+            notifier.alert('No output file specified')
             return
         if path.exists(outfile):
             rename_existing(outfile)
         if file_in_use(outfile):
             details = '{} appears to be open in another program'.format(outfile)
-            notifier.error('Cannot write output file', details = details)
+            notifier.alert('Cannot write output file', details = details)
             return
         if path.exists(outfile) and not writable(outfile):
             details = 'You may not have write permissions to {} '.format(outfile)
-            notifier.error('Cannot write output file', details = details)
+            notifier.alert('Cannot write output file', details = details)
             return
 
         if not outfile.endswith('.csv'):
             outfile += '.csv'
 
-        notifier.info('Writing file {}', outfile)
+        notifier.inform('Writing file {}', outfile)
         found_barcodes = [r.item_barcode for r in records]
         with open(outfile, 'w') as f:
             writer = csv.writer(f, delimiter = ',')

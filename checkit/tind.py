@@ -329,10 +329,11 @@ class Tind(object):
     def _tind_session(self):
         '''Connects to TIND.io using Shibboleth and return session object.'''
         # Shortcuts to make this code more readable
-        fatal = self._notifier.fatal
-        yes_no = self._notifier.yes_no
+        inform = self._notifier.inform
+        fatal = self._notifier.alert_fatal
+        yes_no = self._notifier.ask_yes_no
 
-        self._notifier.info('Authenticating user to TIND')
+        inform('Authenticating user to TIND')
         session = None
         logged_in = False
         # Loop the login part in case the user enters the wrong password.
@@ -400,7 +401,8 @@ class Tind(object):
 
 
     def _tind_request(self, session, get_or_post, url, data, purpose):
-        fatal = self._notifier.fatal
+        '''Issue the network request to TIND.'''
+        fatal = self._notifier.alert_fatal
         access = session.get if get_or_post == 'get' else session.post
         try:
             if __debug__: log('issuing network {} for {}', get_or_post, purpose)
@@ -418,17 +420,18 @@ class Tind(object):
 
     def _tind_json(self, session, barcode_list):
         '''Return the data from using AJAX to search tind.io's global lists.'''
+        inform = self._notifier.inform
 
         # Trial and error testing revealed that if the "OR" expression has
         # more than about 1024 barcodes, TIND returns http code 400.  So, we
         # break up our search into chunks of 1000 (a nice round number).
-        self._notifier.info('Asking TIND for records')
+        inform('Asking TIND for records')
         data = []
         for codes in grouper(barcode_list, 1000):
             search_expr = codes[0] if len(codes) == 1 else '(' + ' OR '.join(codes) + ')'
             payload = self._tind_ajax_payload('barcode', search_expr)
             data += self._tind_ajax(session, payload)
-        self._notifier.info('Received {} records from TIND', len(data))
+        inform('Received {} records from TIND', len(data))
         return data
 
 
@@ -473,6 +476,9 @@ class Tind(object):
 
 
     def _tind_ajax(self, session, payload):
+        # Shortcuts to make this code more readable
+        fatal = self._notifier.alert_fatal
+
         # The session object has Invenio session cookies and Shibboleth IDP
         # session data.  Now we have to invoke the Ajax call that would be
         # triggered by typing in the search box and clicking "Search" at
@@ -489,22 +495,22 @@ class Tind(object):
             resp = session.post(ajax_url, headers = ajax_headers, json = payload)
         except Exception as err:
             details = 'exception doing AJAX call {}'.format(err)
-            self._notifier.fatal('Unable to get data from TIND', details)
+            fatal('Unable to get data from TIND', details)
             raise ServiceFailure(details)
         if resp.status_code != 200:
             details = 'tind.io AJAX returned status {}'.format(resp.status_code)
-            self._notifier.fatal('TIND failed to return data', details)
+            fatal('TIND failed to return data', details)
             raise ServiceFailure(details)
         results = resp.json()
         if 'recordsTotal' not in results or 'data' not in results:
-            self._notifier.fatal('Unexpected result from TIND AJAX call')
+            fatal('Unexpected result from TIND AJAX call')
             raise InternalError('Unexpected result from TIND AJAX call')
         total_records = results['recordsTotal']
         if __debug__: log('TIND says there are {} records', total_records)
         if len(results['data']) != total_records:
             details = 'Expected {} records but received {}'.format(
                 total_records, len(results['data']))
-            self._notifier.fatal('TIND returned unexpected number of items',
+            fatal('TIND returned unexpected number of items',
                                  details = details)
             raise ServiceFailure('TIND returned unexpected number of items')
         if __debug__: log('succeeded in getting data via ajax')
@@ -513,11 +519,11 @@ class Tind(object):
 
     def loan_details(self, tind_id, session):
         '''Get the HTML of a loans detail page from TIND.io.'''
-
+        inform = self._notifier.inform
+        fatal = self._notifier.alert_fatal
         url = 'https://caltech.tind.io/admin2/bibcirculation/get_item_requests_details?ln=en&recid=' + str(tind_id)
         try:
-            if self._notifier:
-                self._notifier.info('Getting details from TIND for {}'.format(tind_id))
+            inform('Getting details from TIND for {}'.format(tind_id))
             (resp, error) = net('get', url, session = session, allow_redirects = True)
             if isinstance(error, NoContent):
                 if __debug__: log('server returned a "no content" code')
@@ -531,20 +537,21 @@ class Tind(object):
                 return content if content.find('There are no loans') < 0 else ''
         except Exception as err:
             details = 'exception connecting to tind.io: {}'.format(err)
-            if self._notifier:
-                self._notifier.fatal('Failed to connect -- try again later', details)
+            fatal('Failed to connect -- try again later', details)
             raise ServiceFailure(details)
 
 
     def patron_details(self, patron_name, patron_url, session):
         '''Get the HTML of a loans detail page from TIND.io.'''
+        inform = self._notifier.inform
+        fatal = self._notifier.alert_fatal
 
         if not patron_name or not patron_url:
             if __debug__: log('no patron => no patron details to get')
             return
         try:
             if self._tracer:
-                self._notifier.info('Getting patron details for {}'.format(patron_name))
+                inform('Getting patron details for {}'.format(patron_name))
             (resp, error) = net('get', patron_url, session = session, allow_redirects = True)
             if isinstance(error, NoContent):
                 if __debug__: log('server returned a "no content" code')
@@ -557,8 +564,7 @@ class Tind(object):
                 return str(resp.content)
         except Exception as err:
             details = 'exception connecting to tind.io: {}'.format(err)
-            if self._notifier:
-                self._notifier.fatal('Failed to connect -- try again later', details)
+            fatal('Failed to connect -- try again later', details)
             raise ServiceFailure(details)
 
 

@@ -94,7 +94,8 @@ def main(no_color = False, no_gui = False, input_csv = 'I', no_keyring = False,
         # MainBody exceptions are caught in the thread, so this is something else.
         exception = sys.exc_info()
 
-    # Common exception handling regardless of whether they came from.
+    # Try to deal with exceptions gracefully ----------------------------------
+
     if exception and type(exception[1]) in [KeyboardInterrupt, UserCancelled]:
         if __debug__: log('received {}', exception[1].__class__.__name__)
     elif exception:
@@ -105,7 +106,7 @@ def main(no_color = False, no_gui = False, input_csv = 'I', no_keyring = False,
         if debugging:
             import pdb; pdb.set_trace()
         if notifier:
-            notifier.fatal('Encountered an error: {}', ex_type, details = details)
+            notifier.alert_fatal('Encountered an error: {}', ex_type, details = details)
         if controller:
             controller.quit()
 
