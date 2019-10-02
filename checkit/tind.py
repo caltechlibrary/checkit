@@ -333,7 +333,7 @@ class Tind(object):
         fatal = self._notifier.alert_fatal
         yes_no = self._notifier.ask_yes_no
 
-        inform('Authenticating user to TIND')
+        inform('Authenticating user to TIND ...')
         session = None
         logged_in = False
         # Loop the login part in case the user enters the wrong password.
@@ -420,18 +420,14 @@ class Tind(object):
 
     def _tind_json(self, session, barcode_list):
         '''Return the data from using AJAX to search tind.io's global lists.'''
-        inform = self._notifier.inform
-
         # Trial and error testing revealed that if the "OR" expression has
         # more than about 1024 barcodes, TIND returns http code 400.  So, we
         # break up our search into chunks of 1000 (a nice round number).
-        inform('Asking TIND for records')
         data = []
         for codes in grouper(barcode_list, 1000):
             search_expr = codes[0] if len(codes) == 1 else '(' + ' OR '.join(codes) + ')'
             payload = self._tind_ajax_payload('barcode', search_expr)
             data += self._tind_ajax(session, payload)
-        inform('Received {} records from TIND', len(data))
         return data
 
 
@@ -523,7 +519,7 @@ class Tind(object):
         fatal = self._notifier.alert_fatal
         url = 'https://caltech.tind.io/admin2/bibcirculation/get_item_requests_details?ln=en&recid=' + str(tind_id)
         try:
-            inform('Getting details from TIND for {}'.format(tind_id))
+            inform('Getting details from TIND for {} ...'.format(tind_id))
             (resp, error) = net('get', url, session = session, allow_redirects = True)
             if isinstance(error, NoContent):
                 if __debug__: log('server returned a "no content" code')
@@ -551,7 +547,7 @@ class Tind(object):
             return
         try:
             if self._tracer:
-                inform('Getting patron details for {}'.format(patron_name))
+                inform('Getting patron details for {} ...'.format(patron_name))
             (resp, error) = net('get', patron_url, session = session, allow_redirects = True)
             if isinstance(error, NoContent):
                 if __debug__: log('server returned a "no content" code')

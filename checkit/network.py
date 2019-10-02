@@ -97,7 +97,7 @@ def timed_request(get_or_post, url, session = None, timeout = 20, **kwargs):
 
 def download_file(url, output_file, user = None, pswd = None, say = None):
     if say:
-        say.inform('Downloading {}'.format(url))
+        say.inform('Downloading {} ...'.format(url))
     try:
         download(url, user, pswd, output_file)
         return True
