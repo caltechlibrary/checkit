@@ -362,7 +362,7 @@ class MainFrame(wx.Frame):
 
     def info_message(self, message):
         self.text_area.SetInsertionPointEnd()
-        self.text_area.AppendText(message + (' ...\n' if message else ''))
+        self.text_area.AppendText(message + '\n')
         self.text_area.ShowPosition(self.text_area.GetLastPosition())
         return True
 
