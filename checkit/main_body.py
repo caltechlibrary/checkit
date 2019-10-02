@@ -137,8 +137,12 @@ class MainBody(Thread):
         # Query TIND for the records matching the barcodes --------------------
 
         notifier.inform('Contacting TIND to get records ...')
-        tind = Tind(accessor, notifier)
-        records = tind.records(barcode_list)
+        try:
+            tind = Tind(accessor, notifier)
+            records = tind.records(barcode_list)
+        except (ServiceFailure, NetworkFailure) as ex:
+            notifier.alert_fatal("Can't connect to TIND -- try later", details = str(ex))
+            return
 
         # The results from Tind may not contain a record for all barcodes,
         # and the input list of barcodes may have duplicates.  The following
