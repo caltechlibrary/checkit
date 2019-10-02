@@ -42,6 +42,7 @@ _COL_INDEX = {
     'item_location_name'   : 5,
     'item_tind_id'         : 6,
     'item_type'            : 7,
+    'holdings_total'       : 8,
 }
 
 
@@ -143,6 +144,13 @@ class MainBody(Thread):
         except (ServiceFailure, NetworkFailure) as ex:
             notifier.alert_fatal("Can't connect to TIND -- try later", details = str(ex))
             return
+
+        # Getting holdings info takes a separate Tind lookup for each item, so
+        # if we're going to write that column later, let's do the lookups now.
+
+        if 'holdings_total' in _COL_INDEX:
+            for rec in records:
+                rec.holdings_total      # Just need to force a lookup
 
         # The results from Tind may not contain a record for all barcodes,
         # and the input list of barcodes may have duplicates.  The following
