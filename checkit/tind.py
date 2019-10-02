@@ -69,6 +69,7 @@ _ATTRIBUTE_TITLES = {
     'requester_type'     : 'Patron type',
     'requester_url'      : 'Requester details page',
     'date_requested'     : 'Date requested',
+    'holdings_total'     : 'Total holdings'
 }
 '''Mapping of Python record object attributes to human-readable short
 descriptive titles for the attributes.  This is used for things like writing
@@ -90,6 +91,7 @@ class TindRecord(BaseRecord):
         # We add some additional attributes on demand.  They're obtained via
         # HTML scraping of TIND pages.  Setting a field here initially to None
         # (as opposed to '') is used as a marker that it hasn't been set.
+        self.holdings_total  = None
         self.requester_name  = None
         self.requester_email = None
         self.requester_type  = None
@@ -97,12 +99,13 @@ class TindRecord(BaseRecord):
         self.date_requested  = None
 
         # The following are additional attributes for Tind records.
-        self._orig_data   = json_dict
-        self._tind        = tind_interface
-        self._session     = session
-        self._loan_data   = ''
-        self._patron_data = ''
-        self._filled      = False
+        self._orig_data     = json_dict
+        self._tind          = tind_interface
+        self._session       = session
+        self._loan_data     = ''
+        self._patron_data   = ''
+        self._holdings_data = ''
+        self._filled        = False
 
         # The rest is initialization of values for a record.
         title_text = json_dict['title']
@@ -146,6 +149,18 @@ class TindRecord(BaseRecord):
     # Note: in the following property handlers setters, the stored value has
     # to be in a property with a DIFFERENT NAME (here, with a leading
     # underscore) to avoid infinite recursion.
+
+    @property
+    def holdings_total(self):
+        if self._holdings_total == None:
+            self._fill_holdings_total()
+        return self._holdings_total
+
+
+    @holdings_total.setter
+    def holdings_total(self, value):
+        self._holdings_total = value
+
 
     @property
     def requester_name(self):
@@ -293,6 +308,27 @@ class TindRecord(BaseRecord):
                 return
             self._requester_email = personal_table_rows[6].find('td').get_text()
             self._requester_type = personal_table_rows[8].find('td').get_text()
+
+
+    def _fill_holdings_total(self):
+        if self._holdings_total is not None:
+            return
+
+        # Get holdings data from Tind.
+        self._holdings_data = self._tind.holdings(self.item_tind_id, self._session)
+        if self._holdings_data:
+            soup = BeautifulSoup(self._holdings_data, features='lxml')
+            tables = soup.body.find_all('table')
+            if len(tables) < 2:
+                if __debug__: log('no holdings')
+                self._holdings_total = 0
+                return
+            rows = len(tables[1].find_all('tr'))
+            # Subtract one because of the heading row.
+            self._holdings_total = rows - 1 if rows else 0
+            if __debug__: log('total holdings = {}', self._holdings_total)
+        else:
+            self._holdings_total = 0
 
 
     @classmethod
@@ -558,6 +594,30 @@ class Tind(object):
                 raise InternalError('Unexpected network return value')
             else:
                 return str(resp.content)
+        except Exception as err:
+            details = 'exception connecting to tind.io: {}'.format(err)
+            fatal('Failed to connect -- try again later', details)
+            raise ServiceFailure(details)
+
+
+    def holdings(self, tind_id, session):
+        '''Get the HTML of a loans detail page from TIND.io.'''
+        inform = self._notifier.inform
+        fatal = self._notifier.alert_fatal
+        url = 'https://caltech.tind.io/record/{}/holdings'.format(tind_id)
+        try:
+            inform('Getting holdings info from TIND for {} ...'.format(tind_id))
+            (resp, error) = net('get', url, session = session, allow_redirects = True)
+            if isinstance(error, NoContent):
+                if __debug__: log('server returned a "no content" code')
+                return ''
+            elif error:
+                raise error
+            elif resp == None:
+                raise InternalError('Unexpected network return value')
+            else:
+                content = str(resp.content)
+                return content if content.find('This record has no copies.') < 0 else ''
         except Exception as err:
             details = 'exception connecting to tind.io: {}'.format(err)
             fatal('Failed to connect -- try again later', details)
