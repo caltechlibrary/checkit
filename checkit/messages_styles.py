@@ -6,8 +6,7 @@ messages_styles: color & style definitions for use with Python colorful.
 import colorful
 from   os import path
 
-import microarchiver
-from microarchiver.debug import log
+from .debug import log
 
 # A missing load statement in colorful 0.53 (the currently-released version
 # as of 2019-08-29) means the COLORNAMES_COLOR palette was actually not

@@ -292,9 +292,9 @@ def styled(text, flags = None, colorize = True):
     # Lazy-load the style definitions if needed.
     global _STYLES_INITIALIZED
     if not _STYLES_INITIALIZED:
-        import microarchiver.messages_styles
+        import checkit.messages_styles
         _STYLES_INITIALIZED = True
-    from microarchiver.messages_styles import _STYLES
+    from checkit.messages_styles import _STYLES
     if type(flags) is not list:
         flags = [flags]
 
