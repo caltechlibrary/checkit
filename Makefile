@@ -67,12 +67,15 @@ ABOUT.md: README.md
 
 # Miscellaneous directives ----------------------------------------------------
 
-clean: clean-dist clean-html
+clean: clean-dist clean-html clean-other
 
 clean-dist:;
 	-rm -fr dist/$(app_name).app dist/$(app_name).pkg dist/$(python_name) build
 
 clean-html:;
 	-rm -fr ABOUT.md ABOUT.html $(python_name)/data/help.html tmp.html
+
+clean-other:;
+	-rm -fr $(python_name)/__pycache__
 
 .PHONY: build build-darwin build-linux clean clean-dist clean-html
