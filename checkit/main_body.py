@@ -109,14 +109,14 @@ class MainBody(Thread):
 
         # Do basic sanity checks ----------------------------------------------
 
-        self._notifier.inform('Doing initial checks')
+        self._notifier.inform('Doing initial checks ...')
         if not network_available():
             raise NetworkFailure('No network connection.')
 
-        # Get input file ------------------------------------------
+        # Read the input file ------------------------------------------
 
         if not infile and controller.is_gui:
-            notifier.inform('Asking user for input file')
+            notifier.inform('Asking user for input file ...')
             infile = controller.open_file('Open barcode file', 'CSV file|*.csv|Any file|*.*')
         if not infile:
             notifier.alert('No input file')
@@ -129,20 +129,30 @@ class MainBody(Thread):
             notifier.alert('Bad input file', details = details)
             return
 
-        # Read the input file and query TIND ----------------------------------
-
-        notifier.inform('Reading file {}', infile)
         barcode_list = []
+        notifier.inform('Reading file {} ...', infile)
         with open(infile, mode="r") as f:
             barcode_list = [row[0] for row in csv.reader(f) if row and row[0].isdigit()]
 
+        # Query TIND for the records matching the barcodes --------------------
+
+        notifier.inform('Contacting TIND to get records ...')
         tind = Tind(accessor, notifier)
         records = tind.records(barcode_list)
+
+        # The results from Tind may not contain a record for all barcodes,
+        # and the input list of barcodes may have duplicates.  The following
+        # loop is O(n^2), but our lists are short so it's not worth optimizing.
+
+        records_sorted = []
+        for barcode in barcode_list:
+            rec = next((r for r in records if r.item_barcode == barcode), None)
+            records_sorted.append(rec)
 
         # Write the output ----------------------------------------------------
 
         if not outfile and controller.is_gui:
-            notifier.inform('Asking user for output file')
+            notifier.inform('Asking user for output file ...')
             outfile = controller.save_file('Output destination file')
         if not outfile:
             notifier.alert('No output file specified')
@@ -161,17 +171,17 @@ class MainBody(Thread):
         if not outfile.endswith('.csv'):
             outfile += '.csv'
 
-        notifier.inform('Writing file {}', outfile)
-        found_barcodes = [r.item_barcode for r in records]
+        notifier.inform('Writing file {} ...', outfile)
         with open(outfile, 'w') as f:
             writer = csv.writer(f, delimiter = ',')
             writer.writerow(self._column_titles_list())
-            for rec in records:
-                writer.writerow(self._row_for_record(rec))
-            # Write markers for barcodes not returned by TIND.
-            missing = [x for x in barcode_list if x not in found_barcodes]
-            for barcode in missing:
-                writer.writerow(self._blank_row_for_barcode(barcode))
+            for idx, rec in enumerate(records_sorted):
+                if rec:
+                    writer.writerow(self._row_for_record(rec))
+                else:
+                    writer.writerow(self._blank_row_for_barcode(barcode_list[idx]))
+
+        notifier.inform('Finished writing output.')
 
 
     def _column_titles_list(self):
