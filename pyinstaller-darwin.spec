@@ -21,7 +21,7 @@ data_files = [ ('checkit/data/help.html', 'checkit/data'),
 
 colorful_package = importlib.import_module('colorful')
 colorful_path = path.dirname(colorful_package.__file__)
-data_files += [(os.path.join(colorful_path, 'data', 'rgb.txt'), 'colorful/data')]
+data_files += [(path.join(colorful_path, 'data', 'rgb.txt'), 'colorful/data')]
 
 # The rest is pretty normal PyInstaller stuff.
 
