@@ -593,8 +593,7 @@ class Tind(object):
             if __debug__: log('no patron => no patron details to get')
             return ''
         try:
-            if self._tracer:
-                inform('Getting patron details for {} ...'.format(patron_name))
+            inform('Getting patron details for {} ...'.format(patron_name))
             (resp, error) = net('get', patron_url, session = session, allow_redirects = True)
             if isinstance(error, NoContent):
                 if __debug__: log('server returned a "no content" code')
