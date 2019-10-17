@@ -91,21 +91,21 @@ class TindRecord(BaseRecord):
         # We add some additional attributes on demand.  They're obtained via
         # HTML scraping of TIND pages.  Setting a field here initially to None
         # (as opposed to '') is used as a marker that it hasn't been set.
-        self.holdings_total  = None
-        self.requester_name  = None
-        self.requester_email = None
-        self.requester_type  = None
-        self.requester_url   = None
-        self.date_requested  = None
+        self._requester_name      = None
+        self._requester_email     = None
+        self._requester_type      = None
+        self._requester_url       = None
+        self._date_requested      = None
 
-        # The following are additional attributes for Tind records.
-        self._orig_data     = json_dict
-        self._tind          = tind_interface
-        self._session       = session
-        self._loan_data     = ''
-        self._patron_data   = ''
-        self._holdings_data = ''
-        self._filled        = False
+        # The following hold data or  are additional attributes 
+        self._orig_data           = json_dict
+        self._tind                = tind_interface
+        self._session             = session
+        self._loan_data           = None
+        self._patron_data         = None
+        self._holdings_data       = None
+        self._filled              = False
+        self._copies_not_on_shelf = None
 
         # The rest is initialization of values for a record.
         title_text = json_dict['title']
@@ -145,21 +145,36 @@ class TindRecord(BaseRecord):
         self.item_record_url    = 'https://caltech.tind.io/record/' + str(self.item_tind_id)
         self.item_details_url   = 'https://caltech.tind.io' + links['barcode']
 
+        # We always write total holdings for each item, so we may as well
+        # get the data now.
+        self.holdings_total = 0
+        self._holdings_data = self._tind.holdings(self.item_tind_id, session)
+        if self._holdings_data:
+            soup = BeautifulSoup(self._holdings_data, features='lxml')
+            tables = soup.body.find_all('table')
+            if len(tables) >= 2:
+                rows = tables[1].find_all('tr')
+                # Subtract one because of the heading row.
+                self.holdings_total = len(rows) - 1 if rows else 0
+        if __debug__: log('total holdings for {} = {}',
+                          self.item_tind_id, self.holdings_total)
+
 
     # Note: in the following property handlers setters, the stored value has
     # to be in a property with a DIFFERENT NAME (here, with a leading
     # underscore) to avoid infinite recursion.
 
     @property
-    def holdings_total(self):
-        if self._holdings_total == None:
-            self._fill_holdings_total()
-        return self._holdings_total
+    def copies_not_on_shelf(self):
+        # Nos = "not on shelf" (lost or on loan)
+        if self._copies_not_on_shelf == None:
+            self._fill_copies_not_on_shelf()
+        return self._copies_not_on_shelf
 
 
-    @holdings_total.setter
-    def holdings_total(self, value):
-        self._holdings_total = value
+    @copies_not_on_shelf.setter
+    def copies_not_on_shelf(self, value):
+        self._copies_not_on_shelf = value
 
 
     @property
@@ -283,7 +298,7 @@ class TindRecord(BaseRecord):
                 barcode = cells[5].get_text()
                 if barcode != self.item_barcode:
                     continue
-                # If we get this far, we found a hold request on this lost book.
+                # If we get this far, we found a hold request.
                 self._requester_name = cells[0].get_text()
                 self._requester_url = cells[0].a['href']
                 self._date_requested = cells[9].get_text()
@@ -321,25 +336,22 @@ class TindRecord(BaseRecord):
             if __debug__: log('no patron for {}', self.item_tind_id)
 
 
-    def _fill_holdings_total(self):
-        if self._holdings_total is not None:
-            return
-
-        # Get holdings data from Tind.
-        self._holdings_data = self._tind.holdings(self.item_tind_id, self._session)
+    def _fill_copies_not_on_shelf(self):
+        '''not on shelf, in this case meaning lost or loaned out'''
+        self._copies_not_on_shelf = []
         if self._holdings_data:
             soup = BeautifulSoup(self._holdings_data, features='lxml')
             tables = soup.body.find_all('table')
-            if len(tables) < 2:
-                if __debug__: log('no holdings')
-                self._holdings_total = 0
-                return
-            rows = len(tables[1].find_all('tr'))
-            # Subtract one because of the heading row.
-            self._holdings_total = rows - 1 if rows else 0
-            if __debug__: log('total holdings = {}', self._holdings_total)
+            rows = tables[1].find_all('tr')
+            to_get = []
+            for row in rows:
+                text = row.text.lower()
+                if text.find('on loan') > 0 or text.find('lost') > 0:
+                    columns = row.find_all('td')
+                    to_get.append(barcode_from_link(columns[0].input))
+            self._copies_not_on_shelf = self._tind.records(to_get, self._session)
         else:
-            self._holdings_total = 0
+            if __debug__: log('no holdings data for {}', self.item_tind_id)
 
 
     @classmethod
@@ -358,18 +370,17 @@ class Tind(object):
         self._notifier = notifier
 
 
-    def records(self, barcode_list):
+    def records(self, barcode_list, session = None):
         if __debug__: log('starting procedure for connecting to tind.io')
-        session = self._tind_session()
+        if barcode_list is None or len(barcode_list) == 0:
+            return []
+        if session is None:
+            session = self._tind_session()
         json_data = self._tind_json(session, barcode_list)
         if not json_data:
             if __debug__: log('no data received from tind')
             return []
-        num_records = len(json_data)
-        if num_records < 1:
-            if __debug__: log('record list from tind is empty')
-            return []
-        if __debug__: log('got {} records from tind.io', num_records)
+        if __debug__: log('got {} records from tind.io', len(json_data))
         return [TindRecord(r, self, session) for r in json_data]
 
 
@@ -387,6 +398,7 @@ class Tind(object):
         while not logged_in:
             # Create a blank session and hack the user agent string.
             session = requests.Session()
+            session.trust_env = False
             session.headers.update( { 'user-agent': _USER_AGENT_STRING } )
 
             # Access the first page to get the session data, and do it before
@@ -664,3 +676,18 @@ def first_author(author_text):
         return HumanName(first_author).last
     except:
         return first_author
+
+
+def barcode_from_link(td):
+    # This expects an element from a Tind holdings table that looks like this:
+    # <input class="bibcircbutton" onmouseout="this.className=\'bibcircbutton\'"
+    #        onclick="location.href=\'https://caltech.tind.io/record/750529/holdings/request?barcode=35047019258938&amp;ln=en\'" 
+    #        ... />
+    onclick = td['onclick']
+    start = onclick.find('barcode=')
+    if start < 0:
+        return ''
+    start += 8
+    end = onclick.find('&', start)
+    end = len(onclick) if end < 1 else end
+    return onclick[start:end]
