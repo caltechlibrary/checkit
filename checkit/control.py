@@ -81,10 +81,9 @@ from .logo import getLogoIcon
 class ControlBase():
     '''User interface controller base class.'''
 
-    def __init__(self, app_name, byline = None, debugging = False):
+    def __init__(self, app_name, byline = None):
         self._name = app_name
         self._byline = byline
-        self._debugging = debugging
 
 
     @property
@@ -98,17 +97,12 @@ class ControlBase():
         return False
 
 
-    @property
-    def debugging(self):
-        '''Returns True if debug mode has been turned on.'''
-        return self._debugging
-
 
 class ControlCLI(ControlBase):
     '''User interface controller in command-line interface mode.'''
 
-    def __init__(self, name, byline = None, debugging = False):
-        super().__init__(name, byline, debugging)
+    def __init__(self, name, byline = None):
+        super().__init__(name, byline)
 
 
     def run(self, worker):
@@ -132,8 +126,8 @@ class ControlCLI(ControlBase):
 class ControlGUI(ControlBase):
     '''User interface controller in GUI mode.'''
 
-    def __init__(self, name, byline = None, debugging = False):
-        super().__init__(name, byline, debugging)
+    def __init__(self, name, byline = None):
+        super().__init__(name, byline)
         self._app = wx.App()
         self._frame = MainFrame(name, byline, None, wx.ID_ANY)
         self._app.SetTopWindow(self._frame)
