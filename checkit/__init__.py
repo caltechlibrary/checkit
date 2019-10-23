@@ -52,3 +52,14 @@ else:
     for name in [key for key in keys if hasattr(metadata, key)]:
         variable_name = '__' + name + '__'
         setattr(this_module, variable_name, getattr(metadata, name))
+
+
+# Miscellaneous utilities.
+# .............................................................................
+
+def print_version():
+    this_module = sys.modules[__package__]
+    print('{} version {}'.format(this_module.__name__, this_module.__version__))
+    print('Authors: {}'.format(this_module.__author__))
+    print('URL: {}'.format(this_module.__url__))
+    print('License: {}'.format(this_module.__license__))
