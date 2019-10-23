@@ -1,60 +1,3 @@
-'''
-control.py: human interface controller
-
-After trying alternatives and failing to get things to work, I settled on the
-following approach that works on both Mac and Windows 10 in my testing.
-
-The constrol structure of this program is somewhat inverted from a typical
-WxPython application.  The typical application would be purely event-driven:
-it would be implemented as an object derived from wx.Frame with methods for
-different kinds of actions that the user can trigger by interacting with
-controls in the GUI.  Once the WxPython app.MainLoop() function is called,
-nothing happens until the user does something to trigger an activitiy.
-Conversely, in this program, I not only wanted to allow command-line based
-interaction, but also wanted the entire process to be started as soon as the
-user starts the application.  This is incompatible with the typical
-event-driven application structure because there's an explicit sequential
-driver and it needs to be kicked off automatically after app.MainLoop() is
-called.
-
-The approach taken here has two main features.
-
-* First, there are two threads running: one for the WxPython GUI MainLoop()
-  code and all GUI objects (like MainFrame and UserDialog in this file), and
-  another thread for the real main body that implements the program's sequence
-  of operations.  The main thread is kicked off by the GUI class start()
-  method right before calling app.MainLoop().
-
-* Second, the main body thread invokes GUI operations using a combination of
-  in-application message passing (using a publish-and-subscribe scheme from
-  PyPubsub) and the use of wx.CallAfter().  The MainFrame objects implement
-  some methods that can be invoked by other classes, and MainFrame defines
-  subscriptions for messages to invoke those methods.  Callers then have to
-  use the following idiom to invoke the methods:
-
-    wx.CallAfter(pub.sendMessage, "name", arg1 = "value1", arg2 = "value2")
-
-  The need for this steps from the fact that in WxPython, if you attempt to
-  invoke a GUI method from outside the main thread, it will either generate
-  an exception or (what I often saw on Windows) simply hang the application.
-  wx.CallAfter places the execution into the thread that's running
-  MainLoop(), thus solving the problem.
-
-Splitting up the GUI and CLI schemes into separate objects is for the sake of
-code modularity and conceptual clarity.
-
-Authors
--------
-
-Michael Hucka <mhucka@caltech.edu> -- Caltech Library
-
-Copyright
----------
-
-Copyright (c) 2019 by the California Institute of Technology.  This code is
-open-source software released under a 3-clause BSD license.  Please see the
-file "LICENSE" for more information.
-'''
 
 import os
 import os.path as path
@@ -62,6 +5,8 @@ from   pubsub import pub
 from   queue import Queue
 import wx
 import wx.adv
+import wx.lib
+from   wx.lib.dialogs import ScrolledMessageDialog
 import wx.richtext
 import sys
 import textwrap
@@ -69,131 +14,17 @@ from   threading import Thread
 from   time import sleep
 import webbrowser
 
-from .files import datadir_path, readable
-from .exceptions import *
 from .debug import log
+from .exceptions import *
+from .files import datadir_path, readable
 from .logo import getLogoIcon
 
-
-# Exported classes.
-# .............................................................................
-
-class ControlBase():
-    '''User interface controller base class.'''
-
-    def __init__(self, app_name, byline = None):
-        self._name = app_name
-        self._byline = byline
-
-
-    @property
-    def app_name(self):
-        return self._name
-
-
-    @property
-    def is_gui(self):
-        '''Returns True if the GUI version of the interface is being used.'''
-        return False
-
-
-
-class ControlCLI(ControlBase):
-    '''User interface controller in command-line interface mode.'''
-
-    def __init__(self, name, byline = None):
-        super().__init__(name, byline)
-
-
-    def run(self, worker):
-        self._worker = worker
-        if __debug__: log('calling start() on worker')
-        worker.start()
-        if __debug__: log('waiting for worker to finish')
-        worker.join()
-        if __debug__: log('calling stop() on worker')
-        worker.stop()
-
-
-    def quit(self):
-        if self._worker:
-            if __debug__: log('calling stop() on worker')
-            self._worker.stop()
-        if __debug__: log('exiting')
-        sys.exit()
-
-
-class ControlGUI(ControlBase):
-    '''User interface controller in GUI mode.'''
-
-    def __init__(self, name, byline = None):
-        super().__init__(name, byline)
-        self._app = wx.App()
-        self._frame = MainFrame(name, byline, None, wx.ID_ANY)
-        self._app.SetTopWindow(self._frame)
-        self._frame.Center()
-        self._frame.Show(True)
-        pub.subscribe(self.quit, "quit")
-
-
-    @property
-    def is_gui(self):
-        '''Returns True if the GUI version of the interface is being used.'''
-        return True
-
-
-    def run(self, worker):
-        self._worker = worker
-        if __debug__: log('calling start() on worker')
-        worker.start()
-        if __debug__: log('starting main GUI loop')
-        self._app.MainLoop()
-        if __debug__: log('waiting for worker to finish')
-        worker.join()
-        if __debug__: log('calling stop() on worker')
-        worker.stop()
-
-
-    def quit(self):
-        if __debug__: log('quitting')
-        if self._worker:
-            if __debug__: log('calling stop() on worker')
-            self._worker.stop()
-        if __debug__: log('destroying control GUI')
-        wx.CallAfter(self._frame.Destroy)
-
-
-    def open_file(self, message, file_pattern):
-        return_queue = Queue()
-        if __debug__: log('sending message to open_file')
-        wx.CallAfter(pub.sendMessage, "open_file", return_queue = return_queue,
-                     message = message, file_pattern = file_pattern)
-        if __debug__: log('blocking to get results')
-        return_queue = return_queue.get()
-        if __debug__: log('got results')
-        return return_queue
-
-
-    def save_file(self, message):
-        return_queue = Queue()
-        if __debug__: log('sending message to save_file')
-        wx.CallAfter(pub.sendMessage, "save_file", return_queue = return_queue,
-                     message = message)
-        if __debug__: log('blocking to get results')
-        return_queue = return_queue.get()
-        if __debug__: log('got results')
-        return return_queue
-
-
-# Internal implementation classes.
-# .............................................................................
-
-class MainFrame(wx.Frame):
+class AppFrame(wx.Frame):
     '''Defines the main application GUI frame.'''
 
-    def __init__(self, name, byline, *args, **kwds):
+    def __init__(self, name, subtitle, *args, **kwds):
         self._name = name
-        self._byline = byline
+        self._subtitle = subtitle
         self._cancel = False
         self._height = 330 if sys.platform.startswith('win') else 300
         self._width  = 500
@@ -201,7 +32,7 @@ class MainFrame(wx.Frame):
         kwds["style"] = kwds.get("style", 0) | wx.DEFAULT_FRAME_STYLE | wx.TAB_TRAVERSAL
         wx.Frame.__init__(self, *args, **kwds)
         self.panel = wx.Panel(self)
-        headline = self._name + ((' — ' + self._byline) if self._byline else '')
+        headline = self._name + ((' — ' + self._subtitle) if self._subtitle else '')
         self.headline = wx.StaticText(self.panel, wx.ID_ANY, headline, style = wx.ALIGN_CENTER)
         self.headline.SetFont(wx.Font(14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_ITALIC,
                                       wx.FONTWEIGHT_BOLD, 0, "Arial"))
@@ -312,7 +143,7 @@ class MainFrame(wx.Frame):
         def quitter():
             sleep(1)
             if __debug__: log('sending message to quit')
-            wx.CallAfter(pub.sendMessage, 'quit')
+            wx.CallAfter(pub.sendMessage, 'stop')
 
         subthread = Thread(target = quitter)
         subthread.start()
