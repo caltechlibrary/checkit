@@ -1,7 +1,18 @@
 '''
-messages_styles: color & style definitions for use with Python colorful.
-'''
+text_styles: color & style definitions for use with Python colorful.
 
+Authors
+-------
+
+Michael Hucka <mhucka@caltech.edu> -- Caltech Library
+
+Copyright
+---------
+
+Copyright (c) 2019 by the California Institute of Technology.  This code is
+open-source software released under a 3-clause BSD license.  Please see the
+file "LICENSE" for more information.
+'''
 
 import colorful
 from   os import path
