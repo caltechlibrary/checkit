@@ -25,6 +25,7 @@ from .exceptions import *
 from .files import readable, writable, file_in_use, rename_existing
 from .network import network_available
 from .tind import Tind, TindRecord
+from .ui import inform, warn, alert, alert_fatal, file_selection
 
 
 # Global constants.
@@ -52,45 +53,38 @@ _COL_INDEX = {
 class MainBody(Thread):
     '''Main body of Check It! implemented as a Python thread.'''
 
-    def __init__(self, infile, outfile, controller, accessor, notifier):
+    def __init__(self, infile, outfile, access):
         '''Initializes main body thread object but does not start the thread.'''
         Thread.__init__(self, name = "MainBody")
-
-        # Make this a daemon thread, but only when using the GUI; for CLI, it
-        # must not be a daemon thread or else the program exits immediately.
-        if controller.is_gui:
-            self.daemon = True
 
         # We expose one attribute, "exception", that callers can use to find
         # out if the thread finished normally or with an exception.
         self.exception = None
 
         # The rest of this sets internal variables used by other methods.
-        self._infile      = infile
-        self._outfile     = outfile
-        self._controller  = controller
-        self._accessor    = accessor
-        self._notifier    = notifier
+        self._infile  = infile
+        self._outfile = outfile
+        self._access  = access
 
 
     def run(self):
         '''Run the main body.'''
-        # Set shortcut variables for better code readability below.
-        controller = self._controller
-        notifier   = self._notifier
-
         # In normal operation, this method returns after things are done and
         # leaves it to the user to exit the application via the control GUI.
-        # If exceptions occur, we capture the stack context for the caller
-        # to interpret, and force the controller to quit.
+        # If exceptions occur, we capture the stack context for the caller.
         try:
-            notifier.inform('Welcome to ' + controller.app_name)
             self._do_main_work()
-            notifier.inform('Done.')
+        except (KeyboardInterrupt, UserCancelled) as ex:
+            if __debug__: log('got {} exception', type(ex).__name__)
+            inform('User cancelled operation -- stopping.')
+            return
         except Exception as ex:
-            if __debug__: log('exception in main body')
+            if __debug__: log('exception in main body: {}', str(ex))
             self.exception = sys.exc_info()
-            controller.quit()
+            details = 'An exception occurred in {}: {}'.format(__package__, str(ex))
+            alert_fatal('Error occurred during execution', details = details)
+            return
+        if __debug__: log('run() finished')
 
 
     def stop(self):
@@ -102,101 +96,96 @@ class MainBody(Thread):
 
     def _do_main_work(self):
         # Set shortcut variables for better code readability below.
-        infile     = self._infile
-        outfile    = self._outfile
-        accessor   = self._accessor
-        controller = self._controller
-        notifier   = self._notifier
+        infile  = self._infile
+        outfile = self._outfile
 
         # Do basic sanity checks ----------------------------------------------
 
-        self._notifier.inform('Doing initial checks ...')
+        inform('Doing initial checks ...')
         if not network_available():
             raise NetworkFailure('No network connection.')
 
-        # Read the input file ------------------------------------------
+        # Read the input file -------------------------------------------------
 
-        if not infile and controller.is_gui:
-            notifier.inform('Asking user for input file ...')
-            infile = controller.open_file('Open barcode file', 'CSV file|*.csv|Any file|*.*')
         if not infile:
-            notifier.alert('No input file')
+            inform('Asking user for input file ...')
+            infile = file_selection('open', 'file of barcodes', 'CSV file|*.csv|Any file|*.*')
+        if not infile:
+            alert('No input file')
             return
         if not readable(infile):
-            notifier.alert('Cannot read file: {}'.format(infile))
+            alert('Cannot read file: {}'.format(infile))
             return
         if not self._file_contains_barcodes(infile):
             details = 'File does not appear to contain barcodes: {}'.format(infile)
-            notifier.alert('Bad input file', details = details)
+            alert('Bad input file', details = details)
             return
 
         barcode_list = []
-        notifier.inform('Reading file {} ...', infile)
+        inform('Reading file {} ...', infile)
         with open(infile, mode="r") as f:
             barcode_list = [row[0] for row in csv.reader(f) if row and row[0].isdigit()]
 
         # Query TIND for the records matching the barcodes --------------------
 
-        notifier.inform('Contacting TIND to get records ...')
+        inform('Contacting TIND to get records ...')
         try:
-            tind = Tind(accessor, notifier)
+            tind = Tind(self._access)
             records = tind.records(barcode_list)
         except (ServiceFailure, NetworkFailure) as ex:
-            notifier.alert_fatal("Can't connect to TIND -- try later", details = str(ex))
+            alert_fatal("Can't connect to TIND -- try later", details = str(ex))
             return
 
-        # Getting holdings info takes a separate Tind lookup for each item, so
-        # if we're going to write that column later, let's do the lookups now.
-
-        if 'holdings_total' in _COL_INDEX:
-            for rec in records:
-                rec.holdings_total      # Just need to force a lookup
-
-        # The results from Tind may not contain a record for all barcodes,
-        # and the input list of barcodes may have duplicates.  The following
-        # loop is O(n^2), but our lists are short so it's not worth optimizing.
+        # The results may not contain a record for all barcodes, and the input
+        # list may have duplicates.  The following puts the records in the
+        # same order as our original barcode_list & puts None for missing
+        # records.  The loop is O(n^2), but our lists are short, so no biggie.
 
         records_sorted = []
         for barcode in barcode_list:
-            rec = next((r for r in records if r.item_barcode == barcode), None)
+            # FIXME: will end up printing wrong barcode
+            rec = next((r for r in records if barcode in r.holdings_barcodes), None)
             records_sorted.append(rec)
 
         # Write the output ----------------------------------------------------
 
-        if not outfile and controller.is_gui:
-            notifier.inform('Asking user for output file ...')
-            outfile = controller.save_file('Output destination file')
         if not outfile:
-            notifier.alert('No output file specified')
+            inform('Asking user for output file ...')
+            outfile = file_selection('save', 'output file')
+        if not outfile:
+            alert('No output file specified')
             return
         if path.exists(outfile):
             rename_existing(outfile)
         if file_in_use(outfile):
             details = '{} appears to be open in another program'.format(outfile)
-            notifier.alert('Cannot write output file', details = details)
+            alert('Cannot write output file', details = details)
             return
         if path.exists(outfile) and not writable(outfile):
             details = 'You may not have write permissions to {} '.format(outfile)
-            notifier.alert('Cannot write output file', details = details)
+            alert('Cannot write output file', details = details)
             return
 
         if not outfile.endswith('.csv'):
             outfile += '.csv'
 
-        notifier.inform('Writing file {} ...', outfile)
+        inform('Writing file {} ...', outfile)
         with open(outfile, 'w') as f:
             writer = csv.writer(f, delimiter = ',')
-            writer.writerow(self._column_titles_list())
+            writer.writerow(self._column_headings_list())
             for idx, rec in enumerate(records_sorted):
-                if rec:
+                if rec is not None:
                     writer.writerow(self._row_for_record(rec))
+                    if rec.holdings_total > 1:
+                        for other_rec in (rec.copies_not_on_shelf or []):
+                            if other_rec.item_barcode != rec.item_barcode:
+                                writer.writerow(self._row_for_record(other_rec))
                 else:
                     writer.writerow(self._blank_row_for_barcode(barcode_list[idx]))
+        inform('Finished writing output.')
 
-        notifier.inform('Finished writing output.')
 
-
-    def _column_titles_list(self):
+    def _column_headings_list(self):
         # Need to be careful to put them in the order that is defined by the
         # values in _COL_INDEX.  Don't just do a simple list comprehension.
         titles_list = ['']*len(_COL_INDEX)

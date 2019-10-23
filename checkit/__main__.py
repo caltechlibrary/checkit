@@ -18,12 +18,13 @@ import plac
 import sys
 
 import checkit
-from checkit.access import AccessHandlerGUI, AccessHandlerCLI
-from checkit.control import ControlGUI, ControlCLI
+from checkit import print_version
+from checkit.access import AccessHandler
+from checkit.ui import UI
 from checkit.exceptions import *
 from checkit.debug import set_debug, log
 from checkit.main_body import MainBody
-from checkit.messages import MessageHandlerGUI, MessageHandlerCLI
+from checkit.run_manager import RunManager
 from checkit.network import network_available
 
 
@@ -31,20 +32,20 @@ from checkit.network import network_available
 # ......................................................................
 
 @plac.annotations(
-    no_color   = ('do not color-code terminal output',                  'flag',   'C'),
-    no_gui     = ('do not start the GUI interface (default: do)',       'flag',   'G'),
-    input_csv  = ('input file containing list of barcodes',             'option', 'i'),
-    no_keyring = ('do not store credentials in a keyring service',      'flag',   'K'),
-    output_csv = ('output file where results should be written as CSV', 'option', 'o'),
-    password   = ('Caltech access password',                            'option', 'p'),
-    reset_keys = ('reset user and password used',                       'flag',   'R'),
-    user       = ('Caltech access user name',                           'option', 'u'),
-    version    = ('print version info and exit',                        'flag',   'V'),
-    debug      = ('write detailed trace to "OUT" ("-" means console)',  'option', '@'),
+    no_color   = ('do not color-code terminal output',                      'flag',   'C'),
+    no_gui     = ('do not start the GUI interface (default: do)',           'flag',   'G'),
+    input_csv  = ('input file containing list of barcodes',                 'option', 'i'),
+    no_keyring = ('do not store credentials in a keyring service',          'flag',   'K'),
+    output_csv = ('output file where results should be written as CSV',     'option', 'o'),
+    password   = ('Caltech access password (default: ask for it)',          'option', 'p'),
+    quiet      = ('only print important diagnostic messages while working', 'flag',   'q'),
+    user       = ('Caltech access user name (default: ask for it)',         'option', 'u'),
+    version    = ('print version info and exit',                            'flag',   'V'),
+    debug      = ('write detailed trace to "OUT" ("-" means console)',      'option', '@'),
 )
 
 def main(no_color = False, no_gui = False, input_csv = 'I', no_keyring = False,
-         output_csv = 'O', password = 'P', reset_keys = False, user = 'U',
+         output_csv = 'O', password = 'P', quiet = False, user = 'U',
          version = False, debug = 'OUT'):
     '''Check It!'''
 
@@ -54,8 +55,8 @@ def main(no_color = False, no_gui = False, input_csv = 'I', no_keyring = False,
     # command line flags make more sense as negated values (e.g., "no-color").
     # However, dealing with negated variables in our code is confusing, so:
     use_color   = not no_color
-    use_keyring = not no_keyring
     use_gui     = not no_gui
+    use_keyring = not no_keyring
     debugging   = debug != 'OUT'
 
     # Preprocess arguments and handle early exits -----------------------------
@@ -66,32 +67,23 @@ def main(no_color = False, no_gui = False, input_csv = 'I', no_keyring = False,
         print_version()
         sys.exit()
 
-    user     = None if user == 'U' else user
-    password = None if password == 'P' else password
-    infile   = None if input_csv == 'I' else input_csv
-    outfile  = None if output_csv == 'O' else output_csv
+    user    = None if user == 'U' else user
+    pswd    = None if password == 'P' else password
+    infile  = None if input_csv == 'I' else input_csv
+    outfile = None if output_csv == 'O' else output_csv
 
     # Do the real work --------------------------------------------------------
 
-    controller = accessor = notifier = exception = None
+    if __debug__: log('starting')
+    ui = manager = exception = None
     try:
-        if __debug__: log('initializing handlers')
-        byline = 'look up barcodes in Caltech TIND'
-        if use_gui:
-            controller = ControlGUI('Check It!', byline, debugging)
-            accessor   = AccessHandlerGUI(user, password)
-            notifier   = MessageHandlerGUI()
-        else:
-            controller = ControlCLI('Check It!', byline, debugging)
-            accessor   = AccessHandlerCLI(user, password, use_keyring, reset_keys)
-            notifier   = MessageHandlerCLI(use_color)
-
-        if __debug__: log('starting main body thread')
-        body = MainBody(infile, outfile, controller, accessor, notifier)
-        controller.run(body)
+        ui = UI('Check It!', 'look up barcodes in TIND', use_gui, use_color, quiet)
+        body = MainBody(infile, outfile, AccessHandler(user, pswd, use_keyring))
+        manager = RunManager()
+        manager.run(ui, body)
         exception = body.exception
     except Exception as ex:
-        # MainBody exceptions are caught in the thread, so this is something else.
+        # MainBody exceptions are caught in its thread, so this is something else.
         exception = sys.exc_info()
 
     # Try to deal with exceptions gracefully ----------------------------------
@@ -105,21 +97,11 @@ def main(no_color = False, no_gui = False, input_csv = 'I', no_keyring = False,
         if __debug__: log('Exception: {}\n{}', ex_type, details)
         if debugging:
             import pdb; pdb.set_trace()
-        if notifier:
-            notifier.alert_fatal('Encountered an error: {}', ex_type, details = details)
-        if controller:
-            controller.quit()
-
-
-# Miscellaneous utilities.
-# .............................................................................
-
-def print_version():
-    this_module = sys.modules[__package__]
-    print('{} version {}'.format(this_module.__name__, this_module.__version__))
-    print('Authors: {}'.format(this_module.__author__))
-    print('URL: {}'.format(this_module.__url__))
-    print('License: {}'.format(this_module.__license__))
+        if ui:
+            ui.stop()
+        if manager:
+            manager.stop()
+    if __debug__: log('exiting')
 
 
 # Main entry point.
