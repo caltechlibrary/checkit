@@ -146,7 +146,7 @@ def alert_fatal(text, *args, **kwargs):
     ui.alert_fatal(text, *args, **kwargs)
 
 
-def file_selection(type, purpose, pattern):
+def file_selection(type, purpose, pattern = '*'):
     ui = UI.instance()
     return ui.file_selection(type, purpose, pattern)
 
@@ -390,15 +390,15 @@ class GUI(UIBase):
         return results_tuple[0], results_tuple[1], results_tuple[2]
 
 
-    def file_selection(self, type, message, file_pattern):
+    def file_selection(self, type, message, pattern):
         return_queue = Queue()
         if __debug__: log('sending message to {}_file', type)
         if type == 'open':
             wx.CallAfter(pub.sendMessage, 'open_file', return_queue = return_queue,
-                         message = message, file_pattern = file_pattern)
+                         message = message, pattern = pattern)
         else:
             wx.CallAfter(pub.sendMessage, 'save_file', return_queue = return_queue,
-                         message = message, file_pattern = file_pattern)
+                         message = message)
         if __debug__: log('blocking to get results')
         return_queue = return_queue.get()
         if __debug__: log('got results')
