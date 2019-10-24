@@ -192,10 +192,10 @@ class AppFrame(wx.Frame):
         return True
 
 
-    def open_file(self, return_queue, message, file_pattern = '*.*'):
+    def open_file(self, return_queue, message, pattern = '*.*'):
         if __debug__: log('creating and showing open file dialog')
         fd = wx.FileDialog(self, message, defaultDir = os.getcwd(),
-                           wildcard = file_pattern,
+                           wildcard = pattern,
                            style = wx.FD_OPEN | wx.FD_FILE_MUST_EXIST)
         cancelled = (fd.ShowModal() == wx.ID_CANCEL)
         file_path = None if cancelled else fd.GetPath()
