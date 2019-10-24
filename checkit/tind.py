@@ -90,21 +90,11 @@ class TindRecord(BaseRecord):
         super().__init__()
         self._initialized = True
 
-        # We add some additional attributes on demand.  They're obtained via
-        # HTML scraping of TIND pages.  Setting a field here initially to None
-        # (as opposed to '') is used as a marker that it hasn't been set.
-        self._requester_name      = None
-        self._requester_email     = None
-        self._requester_type      = None
-        self._requester_url       = None
-        self._date_requested      = None
-
-        # The following hold data or are additional attributes
+        # The following hold data or are additional attributes.
         self._orig_data           = json_dict
         self._tind                = tind_interface
         self._session             = session
         self._loan_data           = None
-        self._patron_data         = None
         self._filled              = False
         self._copies_not_on_shelf = None
 
@@ -146,8 +136,8 @@ class TindRecord(BaseRecord):
         if author_text:
             self.item_author = first_author(author_text)
 
-        self.item_record_url    = 'https://caltech.tind.io/record/' + str(tind_id)
-        self.item_details_url   = 'https://caltech.tind.io' + json_dict['links']['barcode']
+        self.item_record_url  = 'https://caltech.tind.io/record/' + str(tind_id)
+        self.item_details_url = 'https://caltech.tind.io' + json_dict['links']['barcode']
 
         # We always write total holdings for each item, so we may as well
         # get the data now.
@@ -185,66 +175,6 @@ class TindRecord(BaseRecord):
         self._copies_not_on_shelf = value
 
 
-    @property
-    def requester_name(self):
-        if self._requester_name == None:
-            self._fill_requester_info()
-        return self._requester_name
-
-
-    @requester_name.setter
-    def requester_name(self, value):
-        self._requester_name = value
-
-
-    @property
-    def requester_email(self):
-        if self._requester_email == None:
-            self._fill_requester_info()
-        return self._requester_email
-
-
-    @requester_email.setter
-    def requester_email(self, value):
-        self._requester_email = value
-
-
-    @property
-    def requester_url(self):
-        if self._requester_url == None:
-            self._fill_requester_info()
-        return self._requester_url
-
-
-    @requester_url.setter
-    def requester_url(self, value):
-        self._requester_url = value
-
-
-    @property
-    def requester_type(self):
-        if self._requester_type == None:
-            self._fill_requester_info()
-        return self._requester_type
-
-
-    @requester_type.setter
-    def requester_type(self, value):
-        self._requester_type = value
-
-
-    @property
-    def date_requested(self):
-        if self._date_requested == None:
-            self._fill_requester_info()
-        return self._date_requested
-
-
-    @date_requested.setter
-    def date_requested(self, value):
-        self._date_requested = value
-
-
     def as_string(self):
         attr_value_pairs = []
         for attr in dir(self):
@@ -253,95 +183,6 @@ class TindRecord(BaseRecord):
         c_name = self.__class__.__name__
         this_id = str(self.item_tind_id)
         return '<{} {} {}>'.format(c_name, this_id, ' '.join(attr_value_pairs))
-
-
-    def _fill_requester_info(self):
-        if self._filled:
-            return
-        # Though we haven't done anything yet, we have to prevent loops due
-        # to incomplete data, so we don't wait until the end to set this.
-        self._filled = True
-
-        # Get what we can from the loan details page.
-        loans = self._tind.loan_details(self.item_tind_id, self._session)
-        self._fill_loan_details(loans)
-
-        # Get what we can from the loan details page.
-        if self._requester_name:
-            patron = self._tind.patron_details(self._requester_name,
-                                               self._requester_url, self._session)
-            self._fill_patron_details(patron)
-        else:
-            if __debug__: log('no requester for {}', self.item_tind_id)
-
-
-    def _fill_loan_details(self, loans):
-        # If we can't find values, then we leave the following.
-        self._requester_name = ''
-        self._requester_url = ''
-        self._date_requested = ''
-
-        if loans:
-            # Save the loans page in case we need it later.
-            self._loan_data = loans
-            # Parse it and pull out what we can.
-            soup = BeautifulSoup(loans, features='lxml')
-            tables = soup.body.find_all('table')
-            if len(tables) < 2:
-                if __debug__: log('no loan details => no requests')
-                return
-
-            # After the header row, the table contains a list of borrowers for
-            # the item.  Since a given item may have multiple copies, it's
-            # possible for a copy other than the lost one to have a loan on it.
-            # Therefore, we start from the bottom of the table and work our
-            # way backwards, comparing bar codes, to see if the lost copy has
-            # a loan request on it.
-            borrower_table = tables[1]
-            for row in borrower_table.find_all('tr')[1:]:
-                cells = row.find_all('td')
-                if len(cells) < 10:
-                    if __debug__: log('loan details missing expected table cells')
-                    return
-                barcode = cells[5].get_text()
-                if barcode != self.item_barcode:
-                    continue
-                # If we get this far, we found a hold request.
-                self._requester_name = cells[0].get_text()
-                self._requester_url = cells[0].a['href']
-                self._date_requested = cells[9].get_text()
-                # Date is actually date + time, so strip the time part.
-                end = self._date_requested.find(' ')
-                self._date_requested = self._date_requested[:end]
-                # We're done -- don't need to go further.
-                if __debug__: log("hold by {} on {}", self._requester_name,
-                                  self._date_requested)
-                break
-        else:
-            if __debug__: log('no loans for {}', self.item_tind_id)
-
-
-    def _fill_patron_details(self, patron):
-        # If we can't find values, then we leave the following.
-        self._requester_email = ''
-        self._requester_type = ''
-
-        if patron:
-            # Save the patron page in case we need it later.
-            self._patron_data = patron
-            soup = BeautifulSoup(patron, features='lxml')
-            tables = soup.body.find_all('table')
-            if len(tables) < 2:
-                if __debug__: log('patron data missing expected table')
-                return
-            personal_table_rows = tables[1].find_all('tr')
-            if len(personal_table_rows) < 9:
-                if __debug__: log('patron data missing expected table cells')
-                return
-            self._requester_email = personal_table_rows[6].find('td').get_text()
-            self._requester_type = personal_table_rows[8].find('td').get_text()
-        else:
-            if __debug__: log('no patron for {}', self.item_tind_id)
 
 
     def _fill_copies_not_on_shelf(self):
@@ -611,29 +452,6 @@ class Tind(object):
             else:
                 content = str(resp.content)
                 return content if content.find('There are no loans') < 0 else ''
-        except Exception as err:
-            details = 'exception connecting to tind.io: {}'.format(err)
-            alert_fatal('Failed to connect -- try again later', details)
-            raise ServiceFailure(details)
-
-
-    def patron_details(self, patron_name, patron_url, session):
-        '''Get the HTML of a loans detail page from TIND.io.'''
-        if not patron_name or not patron_url:
-            if __debug__: log('no patron => no patron details to get')
-            return ''
-        try:
-            inform('Getting patron details for {} ...'.format(patron_name))
-            (resp, error) = net('get', patron_url, session = session, allow_redirects = True)
-            if isinstance(error, NoContent):
-                if __debug__: log('server returned a "no content" code')
-                return ''
-            elif error:
-                raise error
-            elif resp == None:
-                raise InternalError('Unexpected network return value')
-            else:
-                return str(resp.content)
         except Exception as err:
             details = 'exception connecting to tind.io: {}'.format(err)
             alert_fatal('Failed to connect -- try again later', details)
