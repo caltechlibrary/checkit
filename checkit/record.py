@@ -19,6 +19,38 @@ from datetime import datetime
 from .debug import log
 
 
+# Global constants.
+# .............................................................................
+
+_ATTRIBUTE_TITLES = {
+    'item_title'         : 'Title',
+    'item_author'        : 'Author',
+    'item_type'          : 'Item type',
+    'item_call_number'   : 'Call number',
+    'item_copy_number'   : 'Copy number',
+    'item_tind_id'       : 'TIND id',
+    'item_barcode'       : 'Barcode',
+    'item_details_url'   : 'Details page',
+    'item_record_url'    : 'Item record page',
+    'item_location_name' : 'Location name',
+    'item_location_code' : 'Location code',
+    'item_holds_count'   : 'Hold requests',
+    'item_loan_status'   : 'Loan status',
+    'item_loan_period'   : 'Loan period',
+    'date_created'       : 'Date created',
+    'date_modified'      : 'Date modified',
+    'requester_name'     : 'Requester name',
+    'requester_email'    : 'Requester email',
+    'requester_type'     : 'Patron type',
+    'requester_url'      : 'Requester details page',
+    'date_requested'     : 'Date requested',
+    'holdings_total'     : 'Total holdings'
+}
+'''Mapping of Python record object attributes to human-readable short
+descriptive titles for the attributes.'''
+
+
+
 # Class definitions.
 # .............................................................................
 
@@ -85,3 +117,11 @@ class BaseRecord(object):
 
     def __lt__(self, other):
         return repr(self) < repr(other)
+
+
+    @classmethod
+    def field_title(cls, name):
+        '''Given the name of a field, return a short human-readable title that
+        describes its meaning.'''
+        if name in _ATTRIBUTE_TITLES:
+            return _ATTRIBUTE_TITLES[name]

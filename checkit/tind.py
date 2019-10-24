@@ -25,7 +25,7 @@ from bs4 import BeautifulSoup
 from .debug import log
 from .exceptions import *
 from .network import net
-from .records import BaseRecord
+from .record import BaseRecord
 from .ui import inform, warn, alert, alert_fatal, yes_reply
 
 
@@ -47,34 +47,6 @@ _SSO_URL = 'https://idp.caltech.edu/idp/profile/SAML2/Redirect/SSO'
 '''
 Root URL for the Caltech SAML steps.
 '''
-
-_ATTRIBUTE_TITLES = {
-    'item_title'         : 'Title',
-    'item_author'        : 'Author',
-    'item_type'          : 'Item type',
-    'item_call_number'   : 'Call number',
-    'item_copy_number'   : 'Copy number',
-    'item_tind_id'       : 'TIND id',
-    'item_barcode'       : 'Barcode',
-    'item_details_url'   : 'Details page',
-    'item_record_url'    : 'Item record page',
-    'item_location_name' : 'Location name',
-    'item_location_code' : 'Location code',
-    'item_holds_count'   : 'Hold requests',
-    'item_loan_status'   : 'Loan status',
-    'item_loan_period'   : 'Loan period',
-    'date_created'       : 'Date created',
-    'date_modified'      : 'Date modified',
-    'requester_name'     : 'Requester name',
-    'requester_email'    : 'Requester email',
-    'requester_type'     : 'Patron type',
-    'requester_url'      : 'Requester details page',
-    'date_requested'     : 'Date requested',
-    'holdings_total'     : 'Total holdings'
-}
-'''Mapping of Python record object attributes to human-readable short
-descriptive titles for the attributes.  This is used for things like writing
-spreadsheet column titles.'''
 
 
 # Class definitions.
@@ -390,15 +362,6 @@ class TindRecord(BaseRecord):
             self._copies_not_on_shelf = self._tind.records(to_get, self._session)
         else:
             if __debug__: log('no holdings data for {}', tind_id)
-
-
-    @classmethod
-    def field_title(cls, name):
-        '''Given the name of a field, return a short human-readable title that
-        describes its meaning.'''
-        if name in _ATTRIBUTE_TITLES:
-            return _ATTRIBUTE_TITLES[name]
-
 
 
 # Tind interface class
