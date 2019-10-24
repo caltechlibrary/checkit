@@ -26,6 +26,7 @@ from .debug import log
 from .exceptions import *
 from .network import net
 from .records import BaseRecord
+from .ui import inform, warn, alert, alert_fatal, yes_reply
 
 
 # Global constants.
@@ -82,11 +83,40 @@ spreadsheet column titles.'''
 class TindRecord(BaseRecord):
     '''Class to store structured representations of a TIND request.'''
 
-    def __init__(self, json_dict, tind_interface, session):
+    # Cache of objects created, indexed by tind id.  Useful because we may
+    # end up trying to get the same record in different ways. This is a
+    # class-level variable so that the data is shared across records.
+    _cache = {}
+
+    # Dictionary mapping holdings info to tind id's.  Useful because our inputs
+    # are barcodes, and multiple barcodes may represent copies of the same tind
+    # item, which can lead to trying to look up the same info more than once.
+    # This is a class-level variable so that the data is shared across records.
+    _holdings_data = {}
+
+
+    def __new__(cls, json_dict, tind_interface, session):
         '''json_record = single 'data' record from the raw json returned by
-        the TIND.io ajax call.
+        the TIND.io ajax call.  tind_interface = an instance of the Tind
+        class.  session = a requests session object.
         '''
+        tind_id = json_dict['id_bibrec']
+        if tind_id not in cls._cache:
+            if __debug__: log('creating new TindRecord for {}', tind_id)
+            cls._cache[tind_id] = super(TindRecord, cls).__new__(cls)
+        else:
+            if __debug__: log('returning cached object for {}', tind_id)
+        return cls._cache[tind_id]
+
+
+    def __init__(self, json_dict, tind_interface, session):
+        tind_id = json_dict['id_bibrec']
+        if tind_id in self._cache and hasattr(self._cache[tind_id], '_initialized'):
+            return
+
+        if __debug__: log('initializing TindRecord for {}', tind_id)
         super().__init__()
+        self._initialized = True
 
         # We add some additional attributes on demand.  They're obtained via
         # HTML scraping of TIND pages.  Setting a field here initially to None
@@ -97,20 +127,36 @@ class TindRecord(BaseRecord):
         self._requester_url       = None
         self._date_requested      = None
 
-        # The following hold data or  are additional attributes 
+        # The following hold data or are additional attributes
         self._orig_data           = json_dict
         self._tind                = tind_interface
         self._session             = session
         self._loan_data           = None
         self._patron_data         = None
-        self._holdings_data       = None
         self._filled              = False
         self._copies_not_on_shelf = None
 
         # The rest is initialization of values for a record.
+        self.item_tind_id       = tind_id
+        self.item_call_number   = json_dict['call_no']
+        self.item_copy_number   = json_dict['description']
+        self.item_location_name = json_dict['location_name']
+        self.item_location_code = json_dict['location_code']
+        self.item_loan_status   = json_dict['status']
+        self.item_loan_period   = json_dict['loan_period']
+        self.item_barcode       = json_dict['barcode']
+        self.item_type          = json_dict['item_type']
+        self.holds_count        = json_dict['number_of_requests']
+        self.date_created       = json_dict['creation_date']
+        self.date_modified      = json_dict['modification_date']
+
+        # Additional attributes
+        self.holdings_total     = 1
+        self.holdings_barcodes  = []
+
+        # The 'title' field actually contains author too, so pull it all out.
         title_text = json_dict['title']
         author_text = ''
-        # 'Title' field actually contains author too, so pull it out.
         if title_text.find(' / ') > 0:
             start = title_text.find(' / ')
             self.item_title = title_text[:start].strip()
@@ -128,36 +174,26 @@ class TindRecord(BaseRecord):
         if author_text:
             self.item_author = first_author(author_text)
 
-        self.item_call_number   = json_dict['call_no']
-        self.item_copy_number   = json_dict['description']
-        self.item_location_name = json_dict['location_name']
-        self.item_location_code = json_dict['location_code']
-        self.item_loan_status   = json_dict['status']
-        self.item_loan_period   = json_dict['loan_period']
-        self.item_tind_id       = json_dict['id_bibrec']
-        self.item_barcode       = json_dict['barcode']
-        self.item_type          = json_dict['item_type']
-        self.holds_count        = json_dict['number_of_requests']
-        self.date_created       = json_dict['creation_date']
-        self.date_modified      = json_dict['modification_date']
-
-        links                   = json_dict['links']
-        self.item_record_url    = 'https://caltech.tind.io/record/' + str(self.item_tind_id)
-        self.item_details_url   = 'https://caltech.tind.io' + links['barcode']
+        self.item_record_url    = 'https://caltech.tind.io/record/' + str(tind_id)
+        self.item_details_url   = 'https://caltech.tind.io' + json_dict['links']['barcode']
 
         # We always write total holdings for each item, so we may as well
         # get the data now.
-        self.holdings_total = 0
-        self._holdings_data = self._tind.holdings(self.item_tind_id, session)
-        if self._holdings_data:
-            soup = BeautifulSoup(self._holdings_data, features='lxml')
-            tables = soup.body.find_all('table')
-            if len(tables) >= 2:
-                rows = tables[1].find_all('tr')
-                # Subtract one because of the heading row.
-                self.holdings_total = len(rows) - 1 if rows else 0
-        if __debug__: log('total holdings for {} = {}',
-                          self.item_tind_id, self.holdings_total)
+        if tind_id in self._holdings_data:
+            data = self._holdings_data[tind_id]
+        else:
+            self._holdings_data[tind_id] = self._tind.holdings(tind_id, session)
+            data = self._holdings_data[tind_id]
+        soup = BeautifulSoup(data or '', features='lxml')
+        tables = soup.body.find_all('table')
+        if len(tables) >= 2:
+            rows = tables[1].find_all('tr')
+            # Subtract one because of the heading row.
+            self.holdings_total = len(rows) - 1 if rows else 0
+            for row in rows[1:]:
+                columns = row.find_all('td')
+                self.holdings_barcodes.append(barcode_from_link(columns[0].input))
+        if __debug__: log('total holdings for {} = {}', tind_id, self.holdings_total)
 
 
     # Note: in the following property handlers setters, the stored value has
@@ -339,8 +375,10 @@ class TindRecord(BaseRecord):
     def _fill_copies_not_on_shelf(self):
         '''not on shelf, in this case meaning lost or loaned out'''
         self._copies_not_on_shelf = []
-        if self._holdings_data:
-            soup = BeautifulSoup(self._holdings_data, features='lxml')
+        tind_id = self.item_tind_id
+        if tind_id in self._holdings_data:
+            if __debug__: log('looking in holdings of {} for n.o.s.', tind_id)
+            soup = BeautifulSoup(self._holdings_data[tind_id], features='lxml')
             tables = soup.body.find_all('table')
             rows = tables[1].find_all('tr')
             to_get = []
@@ -351,7 +389,7 @@ class TindRecord(BaseRecord):
                     to_get.append(barcode_from_link(columns[0].input))
             self._copies_not_on_shelf = self._tind.records(to_get, self._session)
         else:
-            if __debug__: log('no holdings data for {}', self.item_tind_id)
+            if __debug__: log('no holdings data for {}', tind_id)
 
 
     @classmethod
@@ -362,38 +400,59 @@ class TindRecord(BaseRecord):
             return _ATTRIBUTE_TITLES[name]
 
 
+
+# Tind interface class
+# .............................................................................
+
 class Tind(object):
     '''Class to interface to TIND.io.'''
 
-    def __init__(self, accesser, notifier):
-        self._accesser = accesser
-        self._notifier = notifier
+    # Cache of record objects created, indexed by barcode.  We may end up
+    # getting records in different ways, so we want to avoid recreating objects.
+    _barcodes_cache = {}
+
+
+    def __init__(self, access):
+        self._access = access
 
 
     def records(self, barcode_list, session = None):
-        if __debug__: log('starting procedure for connecting to tind.io')
         if barcode_list is None or len(barcode_list) == 0:
+            if __debug__: log('empty barcode list => nothing to do')
             return []
-        if session is None:
-            session = self._tind_session()
-        json_data = self._tind_json(session, barcode_list)
-        if not json_data:
-            if __debug__: log('no data received from tind')
-            return []
-        if __debug__: log('got {} records from tind.io', len(json_data))
-        return [TindRecord(r, self, session) for r in json_data]
+        records_list = []
+        barcodes_to_get = []
+        for barcode in barcode_list:
+            if barcode in self._barcodes_cache:
+                if __debug__: log('reusing existing object for {}', barcode)
+                records_list.append(self._barcodes_cache[barcode])
+            else:
+                barcodes_to_get.append(barcode)
+        if barcodes_to_get:
+            if __debug__: log('starting procedure for connecting to tind.io')
+            if session is None:
+                session = self._tind_session()
+            if __debug__: log('will ask tind about {} barcodes', len(barcodes_to_get))
+            json_data = self._tind_json(session, barcodes_to_get)
+            if json_data:
+                if __debug__: log('received {} records from tind.io', len(json_data))
+                records_list += [TindRecord(r, self, session) for r in json_data]
+            else:
+                # This means we have a problem.
+                details = 'Caltech.tind.io returned an empty result for our query'
+                alert_fatal('Empty result from TIND', details)
+                raise ServiceFailure(details)
+        if __debug__: log('returning {} records', len(records_list))
+        return records_list
 
 
     def _tind_session(self):
-        '''Connects to TIND.io using Shibboleth and return session object.'''
-        # Shortcuts to make this code more readable
-        inform = self._notifier.inform
-        fatal = self._notifier.alert_fatal
-        yes_no = self._notifier.ask_yes_no
-
+        '''Connects to TIND.io using Shibboleth and returns a session object.
+        '''
         inform('Authenticating user to TIND ...')
         session = None
         logged_in = False
+        user = pswd = None
         # Loop the login part in case the user enters the wrong password.
         while not logged_in:
             # Create a blank session and hack the user agent string.
@@ -406,9 +465,10 @@ class Tind(object):
             self._tind_request(session, 'get', _SHIBBED_TIND_URL, None, 'Shib login page')
             sessionid = session.cookies.get('JSESSIONID')
 
-            # Now get the credentials.
-            user, pswd, cancelled = self._accesser.name_and_password()
-            if cancelled:
+            # Get the credentials.  The initial values of None for user & pswd
+            # will make AccessHandler use keyring values if they exist.
+            user, pswd, cancel = self._access.name_and_password('Caltech Access', user, pswd)
+            if cancel:
                 if __debug__: log('user cancelled out of login dialog')
                 raise UserCancelled
             if not user or not pswd:
@@ -428,9 +488,13 @@ class Tind(object):
 
             # Did we succeed?
             logged_in = bool(str(content).find('Forgot your password') <= 0)
-            if not logged_in and not yes_no('Incorrect login. Try again?'):
-                if __debug__: log('user cancelled access login')
-                raise UserCancelled
+            if not logged_in:
+                if yes_reply('Incorrect login. Try again?'):
+                    # Don't supply same values to the dialog if they were wrong.
+                    user = pswd = None
+                else:
+                    if __debug__: log('user cancelled access login')
+                    raise UserCancelled
 
         # Extract the SAML data and follow through with the action url.
         # This is needed to get the necessary cookies into the session object.
@@ -438,7 +502,7 @@ class Tind(object):
         tree = html.fromstring(content)
         if tree is None or tree.xpath('//form[@action]') is None:
             details = 'Caltech Shib access result does not have expected form'
-            fatal('Unexpected TIND result -- please inform developers', details)
+            alert_fatal('Unexpected TIND result -- please inform developers', details)
             raise ServiceFailure(details)
         next_url = tree.xpath('//form[@action]')[0].action
         SAMLResponse = tree.xpath('//input[@name="SAMLResponse"]')[0].value
@@ -449,11 +513,11 @@ class Tind(object):
             res = session.post(next_url, data = saml_payload, allow_redirects = True)
         except Exception as err:
             details = 'exception connecting to TIND: {}'.format(err)
-            fatal('Server problem -- try again later', details)
+            alert_fatal('Server problem -- try again later', details)
             raise ServiceFailure(details)
         if res.status_code != 200:
             details = 'TIND network post returned status {}'.format(res.status_code)
-            fatal('Caltech.tind.io circulation page failed to respond', details)
+            alert_fatal('Caltech.tind.io circulation page failed to respond', details)
             raise ServiceFailure(details)
         if __debug__: log('successfully created session with caltech.tind.io')
         return session
@@ -461,18 +525,17 @@ class Tind(object):
 
     def _tind_request(self, session, get_or_post, url, data, purpose):
         '''Issue the network request to TIND.'''
-        fatal = self._notifier.alert_fatal
         access = session.get if get_or_post == 'get' else session.post
         try:
             if __debug__: log('issuing network {} for {}', get_or_post, purpose)
             req = access(url, data = data, allow_redirects = True)
         except Exception as err:
             details = 'exception connecting to TIND: {}'.format(err)
-            fatal('Unable to connect to TIND -- try later', details)
+            alert_fatal('Unable to connect to TIND -- try later', details)
             raise ServiceFailure(details)
         if req.status_code >= 300:
             details = 'Shibboleth returned status {}'.format(req.status_code)
-            fatal('Service failure -- please inform developers', details)
+            alert_fatal('Service failure -- please inform developers', details)
             raise ServiceFailure(details)
         return req.content
 
@@ -531,9 +594,6 @@ class Tind(object):
 
 
     def _tind_ajax(self, session, payload):
-        # Shortcuts to make this code more readable
-        fatal = self._notifier.alert_fatal
-
         # The session object has Invenio session cookies and Shibboleth IDP
         # session data.  Now we have to invoke the Ajax call that would be
         # triggered by typing in the search box and clicking "Search" at
@@ -550,22 +610,22 @@ class Tind(object):
             resp = session.post(ajax_url, headers = ajax_headers, json = payload)
         except Exception as err:
             details = 'exception doing AJAX call {}'.format(err)
-            fatal('Unable to get data from TIND', details)
+            alert_fatal('Unable to get data from TIND', details)
             raise ServiceFailure(details)
         if resp.status_code != 200:
             details = 'tind.io AJAX returned status {}'.format(resp.status_code)
-            fatal('TIND failed to return data', details)
+            alert_fatal('TIND failed to return data', details)
             raise ServiceFailure(details)
         results = resp.json()
         if 'recordsTotal' not in results or 'data' not in results:
-            fatal('Unexpected result from TIND AJAX call')
+            alert_fatal('Unexpected result from TIND AJAX call')
             raise InternalError('Unexpected result from TIND AJAX call')
         total_records = results['recordsTotal']
         if __debug__: log('TIND says there are {} records', total_records)
         if len(results['data']) != total_records:
             details = 'Expected {} records but received {}'.format(
                 total_records, len(results['data']))
-            fatal('TIND returned unexpected number of items',
+            alert_fatal('TIND returned unexpected number of items',
                                  details = details)
             raise ServiceFailure('TIND returned unexpected number of items')
         if __debug__: log('succeeded in getting data via ajax')
@@ -574,8 +634,6 @@ class Tind(object):
 
     def loan_details(self, tind_id, session):
         '''Get the HTML of a loans detail page from TIND.io.'''
-        inform = self._notifier.inform
-        fatal = self._notifier.alert_fatal
         url = 'https://caltech.tind.io/admin2/bibcirculation/get_item_requests_details?ln=en&recid=' + str(tind_id)
         try:
             inform('Getting details from TIND for {} ...'.format(tind_id))
@@ -592,15 +650,12 @@ class Tind(object):
                 return content if content.find('There are no loans') < 0 else ''
         except Exception as err:
             details = 'exception connecting to tind.io: {}'.format(err)
-            fatal('Failed to connect -- try again later', details)
+            alert_fatal('Failed to connect -- try again later', details)
             raise ServiceFailure(details)
 
 
     def patron_details(self, patron_name, patron_url, session):
         '''Get the HTML of a loans detail page from TIND.io.'''
-        inform = self._notifier.inform
-        fatal = self._notifier.alert_fatal
-
         if not patron_name or not patron_url:
             if __debug__: log('no patron => no patron details to get')
             return ''
@@ -618,14 +673,12 @@ class Tind(object):
                 return str(resp.content)
         except Exception as err:
             details = 'exception connecting to tind.io: {}'.format(err)
-            fatal('Failed to connect -- try again later', details)
+            alert_fatal('Failed to connect -- try again later', details)
             raise ServiceFailure(details)
 
 
     def holdings(self, tind_id, session):
         '''Get the HTML of a loans detail page from TIND.io.'''
-        inform = self._notifier.inform
-        fatal = self._notifier.alert_fatal
         url = 'https://caltech.tind.io/record/{}/holdings'.format(tind_id)
         try:
             inform('Getting holdings info from TIND for {} ...'.format(tind_id))
@@ -642,7 +695,7 @@ class Tind(object):
                 return content if content.find('This record has no copies.') < 0 else ''
         except Exception as err:
             details = 'exception connecting to tind.io: {}'.format(err)
-            fatal('Failed to connect -- try again later', details)
+            alert_fatal('Failed to connect -- try again later', details)
             raise ServiceFailure(details)
 
 
