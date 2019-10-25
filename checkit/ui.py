@@ -465,9 +465,9 @@ class GUI(UIBase):
 
     def _show_note(self, text, *args, severity = 'info'):
         '''Displays a simple notice with a single OK button.'''
+        if __debug__: log('showing note dialog')
         frame = self._current_frame()
         icon = wx.ICON_WARNING if severity == 'warn' else wx.ICON_INFORMATION
-        if __debug__: log('showing note dialog')
         dlg = wx.GenericMessageDialog(frame, text.format(*args),
                                       caption = "Check It!", style = wx.OK | icon)
         clicked = dlg.ShowModal()
@@ -477,17 +477,18 @@ class GUI(UIBase):
 
 
     def _show_dialog(self, text, details, severity = 'error'):
+        if __debug__: log('showing message dialog')
         frame = self._current_frame()
-        if 'fatal' in severity:
+        if severity == 'fatal':
             short = text
             style = wx.OK | wx.ICON_ERROR
             extra_text = 'fatal '
         else:
             short = text + '\n\nWould you like to try to continue?\n(Click "no" to quit now.)'
             style = wx.YES_NO | wx.YES_DEFAULT | wx.ICON_EXCLAMATION
+            extra_text = ''
         if details:
             style |= wx.HELP
-        if __debug__: log('showing message dialog')
         caption = "Check It! has encountered a {}problem".format(extra_text)
         dlg = wx.MessageDialog(frame, message = short, style = style, caption = caption)
         clicked = dlg.ShowModal()
