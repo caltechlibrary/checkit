@@ -128,6 +128,36 @@ class Tind(object):
         return holdings_dict
 
 
+    def filled_record(self, json_dict):
+        '''Returns a new instance of ItemRecord filled out using the data in
+        the JSON dictionary 'json_dict', which is assumed to contain the fields
+        in the kind of JSON record returned by the TIND ajax calls we make.
+        '''
+        if __debug__: log('creating record for {}', json_dict['barcode'])
+        (title, author)      = title_and_author(json_dict['title'])
+        r                    = ItemRecord()
+        r.item_title         = title
+        r.item_author        = author
+        r.item_barcode       = json_dict['barcode']
+        r.item_tind_id       = json_dict['id_bibrec']
+        r.item_call_number   = json_dict['call_no']
+        r.item_copy_number   = json_dict['description']
+        r.item_location_name = json_dict['location_name']
+        r.item_location_code = json_dict['location_code']
+        r.item_status        = json_dict['status']
+        r.item_loan_period   = json_dict['loan_period']
+        r.item_type          = json_dict['item_type']
+        r.holds_count        = json_dict['number_of_requests']
+        r.date_created       = json_dict['creation_date']
+        r.date_modified      = json_dict['modification_date']
+        r.item_record_url    = 'https://caltech.tind.io/record/' + str(r.item_tind_id)
+        # Note: the value of ['links']['barcode'] is not the same as barcode
+        r.item_details_url   = 'https://caltech.tind.io' + json_dict['links']['barcode']
+        # Save the data we used in an extra field, in case it's useful.
+        r._orig_data = json_dict
+        return r
+
+
     def _tind_session(self, access_handler):
         '''Connects to TIND.io using Shibboleth and returns a session object.
         '''
@@ -349,36 +379,6 @@ class Tind(object):
             details = 'exception connecting to tind.io: {}'.format(err)
             alert_fatal('Failed to connect -- try again later', details)
             raise ServiceFailure(details)
-
-
-    def filled_record(self, json_dict):
-        '''Returns a new instance of ItemRecord filled out using the data in
-        the JSON dictionary 'json_dict', which is assumed to contain the fields
-        in the kind of JSON record returned by the TIND ajax calls we make.
-        '''
-        if __debug__: log('creating record for {}', json_dict['barcode'])
-        (title, author)      = title_and_author(json_dict['title'])
-        r                    = ItemRecord()
-        r.item_title         = title
-        r.item_author        = author
-        r.item_barcode       = json_dict['barcode']
-        r.item_tind_id       = json_dict['id_bibrec']
-        r.item_call_number   = json_dict['call_no']
-        r.item_copy_number   = json_dict['description']
-        r.item_location_name = json_dict['location_name']
-        r.item_location_code = json_dict['location_code']
-        r.item_status        = json_dict['status']
-        r.item_loan_period   = json_dict['loan_period']
-        r.item_type          = json_dict['item_type']
-        r.holds_count        = json_dict['number_of_requests']
-        r.date_created       = json_dict['creation_date']
-        r.date_modified      = json_dict['modification_date']
-        r.item_record_url    = 'https://caltech.tind.io/record/' + str(r.item_tind_id)
-        # Note: the value of ['links']['barcode'] is not the same as barcode
-        r.item_details_url   = 'https://caltech.tind.io' + json_dict['links']['barcode']
-        # Save the data we used in an extra field, in case it's useful.
-        r._orig_data = json_dict
-        return r
 
 
 # Miscellaneous utilities.
