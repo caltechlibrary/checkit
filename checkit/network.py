@@ -193,13 +193,16 @@ def net(get_or_post, url, session = None, polling = False, recursing = 0, **kwar
 
     If keyword 'polling' is True, certain statuses like 404 are ignored and
     the response is returned; otherwise, they are considered errors.
+
+    This method hands allow_redirects = True to the underlying Python requests
+    network call.
     '''
     def addurl(text):
         return (text + ' for {}').format(url)
 
     req = None
     try:
-        req = timed_request(get_or_post, url, session, **kwargs)
+        req = timed_request(get_or_post, url, session, allow_redirects = True, **kwargs)
     except requests.exceptions.ConnectionError as ex:
         if recursing >= _MAX_RECURSIVE_CALLS:
             return (req, NetworkFailure(addurl('Too many connection errors')))
