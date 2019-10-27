@@ -133,7 +133,7 @@ class Tind(object):
         the JSON dictionary 'json_dict', which is assumed to contain the fields
         in the kind of JSON record returned by the TIND ajax calls we make.
         '''
-        if __debug__: log('creating record for {}', json_dict['barcode'])
+        if __debug__: log('creating item record for {}', json_dict['barcode'])
         (title, author)      = title_and_author(json_dict['title'])
         r                    = ItemRecord()
         r.item_title         = title
@@ -259,6 +259,7 @@ class Tind(object):
         for codes in grouper(barcode_list, 1000):
             search_expr = codes[0] if len(codes) == 1 else '(' + ' OR '.join(codes) + ')'
             payload = self._tind_ajax_payload('barcode', search_expr)
+            if __debug__: log('doing ajax call for {} barcodes', len(codes))
             data += self._tind_ajax(session, payload)
         return data
 
