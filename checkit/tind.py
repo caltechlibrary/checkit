@@ -184,8 +184,8 @@ class Tind(object):
                 if __debug__: log('user cancelled out of login dialog')
                 raise UserCancelled
             if not user or not pswd:
-                if __debug__: log('empty values returned from login dialog')
-                return None
+                warn('Cannot proceed with empty log in name or password')
+                raise UserCancelled
             login = {'j_username': user, 'j_password': pswd, '_eventId_proceed': ''}
 
             # SAML step 1
