@@ -37,8 +37,8 @@ _ATTRIBUTE_TITLES = {
     'item_record_url'    : 'Item record page',
     'item_location_name' : 'Location name',
     'item_location_code' : 'Location code',
+    'item_status'        : 'Item status',
     'item_holds_count'   : 'Hold requests',
-    'item_loan_status'   : 'Loan status',
     'item_loan_period'   : 'Loan period',
     'date_created'       : 'Date created',
     'date_modified'      : 'Date modified',
@@ -72,8 +72,8 @@ class ItemRecord(object):
         self.item_record_url = ''              # links.title
         self.item_location_name = ''           # location_name
         self.item_location_code = ''           # location_code
+        self.item_status = ''                  # status
         self.item_holds_count = ''             # number_of_requests
-        self.item_loan_status = ''             # status
         self.item_loan_period = ''             # loan_period
         self.date_created = ''                 # creation_date
         self.date_modified = ''                # modification_date
