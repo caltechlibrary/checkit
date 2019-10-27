@@ -14,6 +14,7 @@ is open-source software released under a 3-clause BSD license.  Please see the
 file "LICENSE" for more information.
 '''
 
+from   collections import namedtuple
 from   iteration_utilities import grouper
 import json
 from   nameparser import HumanName
@@ -25,8 +26,18 @@ from bs4 import BeautifulSoup
 from .debug import log
 from .exceptions import *
 from .network import net
-from .record import BaseRecord
+from .record import ItemRecord
 from .ui import inform, warn, alert, alert_fatal, yes_reply
+
+
+# Helper data types.
+# -----------------------------------------------------------------------------
+
+Holding = namedtuple('Holding', 'barcode status location')
+Holding.__doc__ ='''
+Named tuple describing the status (as a string such as 'on shelf' or 'lost')
+and expected location for a given barcode.
+'''
 
 
 # Global constants.
@@ -39,208 +50,52 @@ in order to make Shibboleth or TIND return results.
 '''
 
 _SHIBBED_TIND_URL = 'https://caltech.tind.io/youraccount/shibboleth?referer=https%3A//caltech.tind.io/%3F'
-'''
-URL to start the Shibboleth authentication process for the Caltech TIND page.
-'''
+'''URL to start the Shibboleth authentication process for Caltech TIND.'''
 
 _SSO_URL = 'https://idp.caltech.edu/idp/profile/SAML2/Redirect/SSO'
-'''
-Root URL for the Caltech SAML steps.
-'''
+'''Root URL for the Caltech SAML steps.'''
 
 
 # Class definitions.
 # .............................................................................
 
-class TindRecord(BaseRecord):
-    '''Class to store structured representations of a TIND request.'''
-
-    # Cache of objects created, indexed by tind id.  Useful because we may
-    # end up trying to get the same record in different ways. This is a
-    # class-level variable so that the data is shared across records.
-    _cache = {}
-
-    # Dictionary mapping holdings info to tind id's.  Useful because our inputs
-    # are barcodes, and multiple barcodes may represent copies of the same tind
-    # item, which can lead to trying to look up the same info more than once.
-    # This is a class-level variable so that the data is shared across records.
-    _holdings_data = {}
-
-
-    def __new__(cls, json_dict, tind_interface, session):
-        '''json_record = single 'data' record from the raw json returned by
-        the TIND.io ajax call.  tind_interface = an instance of the Tind
-        class.  session = a requests session object.
-        '''
-        tind_id = json_dict['id_bibrec']
-        if tind_id not in cls._cache:
-            if __debug__: log('creating new TindRecord for {}', tind_id)
-            cls._cache[tind_id] = super(TindRecord, cls).__new__(cls)
-        else:
-            if __debug__: log('returning cached object for {}', tind_id)
-        return cls._cache[tind_id]
-
-
-    def __init__(self, json_dict, tind_interface, session):
-        tind_id = json_dict['id_bibrec']
-        if tind_id in self._cache and hasattr(self._cache[tind_id], '_initialized'):
-            return
-
-        if __debug__: log('initializing TindRecord for {}', tind_id)
-        super().__init__()
-        self._initialized = True
-
-        # The following hold data or are additional attributes.
-        self._orig_data           = json_dict
-        self._tind                = tind_interface
-        self._session             = session
-        self._loan_data           = None
-        self._filled              = False
-        self._copies_not_on_shelf = None
-
-        # The rest is initialization of values for a record.
-        self.item_tind_id       = tind_id
-        self.item_call_number   = json_dict['call_no']
-        self.item_copy_number   = json_dict['description']
-        self.item_location_name = json_dict['location_name']
-        self.item_location_code = json_dict['location_code']
-        self.item_loan_status   = json_dict['status']
-        self.item_loan_period   = json_dict['loan_period']
-        self.item_barcode       = json_dict['barcode']
-        self.item_type          = json_dict['item_type']
-        self.holds_count        = json_dict['number_of_requests']
-        self.date_created       = json_dict['creation_date']
-        self.date_modified      = json_dict['modification_date']
-
-        # Additional attributes
-        self.holdings_total     = 1
-        self.holdings_barcodes  = []
-
-        # The 'title' field actually contains author too, so pull it all out.
-        title_text = json_dict['title']
-        author_text = ''
-        if title_text.find(' / ') > 0:
-            start = title_text.find(' / ')
-            self.item_title = title_text[:start].strip()
-            author_text = title_text[start + 3:].strip()
-        elif title_text.find('[by]') > 0:
-            start = title_text.find('[by]')
-            self.item_title = title_text[:start].strip()
-            author_text = title_text[start + 5:].strip()
-        elif title_text.rfind(', by') > 0:
-            start = title_text.rfind(', by')
-            self.item_title = title_text[:start].strip()
-            author_text = title_text[start + 5:].strip()
-        else:
-            self.item_title = title_text
-        if author_text:
-            self.item_author = first_author(author_text)
-
-        self.item_record_url  = 'https://caltech.tind.io/record/' + str(tind_id)
-        self.item_details_url = 'https://caltech.tind.io' + json_dict['links']['barcode']
-
-        # We always write total holdings for each item, so we may as well
-        # get the data now.
-        if tind_id in self._holdings_data:
-            data = self._holdings_data[tind_id]
-        else:
-            self._holdings_data[tind_id] = self._tind.holdings(tind_id, session)
-            data = self._holdings_data[tind_id]
-        soup = BeautifulSoup(data or '', features='lxml')
-        tables = soup.body.find_all('table')
-        if len(tables) >= 2:
-            rows = tables[1].find_all('tr')
-            # Subtract one because of the heading row.
-            self.holdings_total = len(rows) - 1 if rows else 0
-            for row in rows[1:]:
-                columns = row.find_all('td')
-                self.holdings_barcodes.append(barcode_from_link(columns[0].input))
-        if __debug__: log('total holdings for {} = {}', tind_id, self.holdings_total)
-
-
-    # Note: in the following property handlers setters, the stored value has
-    # to be in a property with a DIFFERENT NAME (here, with a leading
-    # underscore) to avoid infinite recursion.
-
-    @property
-    def copies_not_on_shelf(self):
-        # Nos = "not on shelf" (lost or on loan)
-        if self._copies_not_on_shelf == None:
-            self._fill_copies_not_on_shelf()
-        return self._copies_not_on_shelf
-
-
-    @copies_not_on_shelf.setter
-    def copies_not_on_shelf(self, value):
-        self._copies_not_on_shelf = value
-
-
-    def as_string(self):
-        attr_value_pairs = []
-        for attr in dir(self):
-            if attr.startswith('item_') or attr.startswith('date_'):
-                attr_value_pairs.append(attr + '="' + str(getattr(self, attr)) + '"')
-        c_name = self.__class__.__name__
-        this_id = str(self.item_tind_id)
-        return '<{} {} {}>'.format(c_name, this_id, ' '.join(attr_value_pairs))
-
-
-    def _fill_copies_not_on_shelf(self):
-        '''not on shelf, in this case meaning lost or loaned out'''
-        self._copies_not_on_shelf = []
-        tind_id = self.item_tind_id
-        if tind_id in self._holdings_data:
-            if __debug__: log('looking in holdings of {} for n.o.s.', tind_id)
-            soup = BeautifulSoup(self._holdings_data[tind_id], features='lxml')
-            tables = soup.body.find_all('table')
-            rows = tables[1].find_all('tr')
-            to_get = []
-            for row in rows:
-                text = row.text.lower()
-                if text.find('on loan') > 0 or text.find('lost') > 0:
-                    columns = row.find_all('td')
-                    to_get.append(barcode_from_link(columns[0].input))
-            self._copies_not_on_shelf = self._tind.records(to_get, self._session)
-        else:
-            if __debug__: log('no holdings data for {}', tind_id)
-
-
-# Tind interface class
-# .............................................................................
-
 class Tind(object):
     '''Class to interface to TIND.io.'''
 
+    # Session created from the user log in.
+    _session = None
+
     # Cache of record objects created, indexed by barcode.  We may end up
     # getting records in different ways, so we want to avoid recreating objects.
-    _barcodes_cache = {}
+    _cache = {}
+
+    # Track the holdings for a given item.  This is a dictionary indexed by
+    # ItemRecord objects, and each value is a list of Holding named tuples,
+    # one tuple for each copy of the item according to Caltech.tind.io.
+    _holdings = {}
 
 
     def __init__(self, access):
-        self._access = access
+        if __debug__: log('initializing Tind() object')
+        self._session = self._tind_session(access)
 
 
-    def records(self, barcode_list, session = None):
-        if barcode_list is None or len(barcode_list) == 0:
-            if __debug__: log('empty barcode list => nothing to do')
-            return []
+    def records(self, barcode_list):
         records_list = []
-        barcodes_to_get = []
+        to_get = []
         for barcode in barcode_list:
-            if barcode in self._barcodes_cache:
+            # Check the cache in case already have records from a previous call.
+            if barcode in self._cache:
                 if __debug__: log('reusing existing object for {}', barcode)
-                records_list.append(self._barcodes_cache[barcode])
+                records_list.append(self._cache[barcode])
             else:
-                barcodes_to_get.append(barcode)
-        if barcodes_to_get:
-            if __debug__: log('starting procedure for connecting to tind.io')
-            if session is None:
-                session = self._tind_session()
-            if __debug__: log('will ask tind about {} barcodes', len(barcodes_to_get))
-            json_data = self._tind_json(session, barcodes_to_get)
+                to_get.append(barcode)
+        if to_get:
+            if __debug__: log('will ask tind about {} barcodes', len(to_get))
+            json_data = self._tind_json(self._session, to_get)
             if json_data:
                 if __debug__: log('received {} records from tind.io', len(json_data))
-                records_list += [TindRecord(r, self, session) for r in json_data]
+                records_list += [self.filled_record(r) for r in json_data]
             else:
                 # This means we have a problem.
                 details = 'Caltech.tind.io returned an empty result for our query'
@@ -250,7 +105,30 @@ class Tind(object):
         return records_list
 
 
-    def _tind_session(self):
+    def holdings(self, records_list):
+        '''Takes a list of ItemRecords, and returns a dictionary where the keys
+        are ItemRecords and the values are lists of Holding tuples.  The list
+        thereby describes the status (on shelf, lost, etc.) and location of
+        each copy of the item described by the ItemRecord.
+        '''
+        holdings_dict = {}
+        to_get = []
+        for record in records_list:
+            # Check the cache in case already have holdings from a previous call.
+            if record in self._holdings:
+                if __debug__: log('returning stored holdings for {}', record)
+                holdings_dict[record] = self._holdings[record]
+            else:
+                to_get.append(record)
+        if to_get:
+            if __debug__: log('will ask tind about {} holdings', len(to_get))
+            for record in [r for r in to_get if r not in holdings_dict]:
+                holdings_dict[record] = self._tind_holdings(self._session, record)
+        if __debug__: log('returning {} records', len(holdings_dict))
+        return holdings_dict
+
+
+    def _tind_session(self, access_handler):
         '''Connects to TIND.io using Shibboleth and returns a session object.
         '''
         inform('Authenticating user to TIND ...')
@@ -271,16 +149,14 @@ class Tind(object):
 
             # Get the credentials.  The initial values of None for user & pswd
             # will make AccessHandler use keyring values if they exist.
-            user, pswd, cancel = self._access.name_and_password('Caltech Access', user, pswd)
+            user, pswd, cancel = access_handler.name_and_password('Caltech Access', user, pswd)
             if cancel:
                 if __debug__: log('user cancelled out of login dialog')
                 raise UserCancelled
             if not user or not pswd:
                 if __debug__: log('empty values returned from login dialog')
                 return None
-            login = {'j_username'       : user,
-                     'j_password'       : pswd,
-                     '_eventId_proceed' : ''}
+            login = {'j_username': user, 'j_password': pswd, '_eventId_proceed': ''}
 
             # SAML step 1
             next_url = '{};jsessionid={}?execution=e1s1'.format(_SSO_URL, sessionid)
@@ -314,7 +190,7 @@ class Tind(object):
         saml_payload = {'SAMLResponse': SAMLResponse, 'RelayState': RelayState}
         try:
             if __debug__: log('issuing network post to {}', next_url)
-            res = session.post(next_url, data = saml_payload, allow_redirects = True)
+            res = session.post(next_url, data = saml_payload)
         except Exception as err:
             details = 'exception connecting to TIND: {}'.format(err)
             alert_fatal('Server problem -- try again later', details)
@@ -332,7 +208,7 @@ class Tind(object):
         access = session.get if get_or_post == 'get' else session.post
         try:
             if __debug__: log('issuing network {} for {}', get_or_post, purpose)
-            req = access(url, data = data, allow_redirects = True)
+            req = access(url, data = data)
         except Exception as err:
             details = 'exception connecting to TIND: {}'.format(err)
             alert_fatal('Unable to connect to TIND -- try later', details)
@@ -345,7 +221,7 @@ class Tind(object):
 
 
     def _tind_json(self, session, barcode_list):
-        '''Return the data from using AJAX to search tind.io's global lists.'''
+        '''Return the data obtained using AJAX to search tind.io's global lists.'''
         # Trial and error testing revealed that if the "OR" expression has
         # more than about 1024 barcodes, TIND returns http code 400.  So, we
         # break up our search into chunks of 1000 (a nice round number).
@@ -436,55 +312,105 @@ class Tind(object):
         return results['data']
 
 
-    def loan_details(self, tind_id, session):
-        '''Get the HTML of a loans detail page from TIND.io.'''
-        url = 'https://caltech.tind.io/admin2/bibcirculation/get_item_requests_details?ln=en&recid=' + str(tind_id)
-        try:
-            inform('Getting details from TIND for {} ...'.format(tind_id))
-            (resp, error) = net('get', url, session = session, allow_redirects = True)
-            if isinstance(error, NoContent):
-                if __debug__: log('server returned a "no content" code')
-                return ''
-            elif error:
-                raise error
-            elif resp == None:
-                raise InternalError('Unexpected network return value')
-            else:
-                content = str(resp.content)
-                return content if content.find('There are no loans') < 0 else ''
-        except Exception as err:
-            details = 'exception connecting to tind.io: {}'.format(err)
-            alert_fatal('Failed to connect -- try again later', details)
-            raise ServiceFailure(details)
-
-
-    def holdings(self, tind_id, session):
-        '''Get the HTML of a loans detail page from TIND.io.'''
+    def _tind_holdings(self, session, record):
+        '''Returns a list of Holding tuples.
+        '''
+        tind_id = record.item_tind_id
         url = 'https://caltech.tind.io/record/{}/holdings'.format(tind_id)
+        holdings = []
         try:
             inform('Getting holdings info from TIND for {} ...'.format(tind_id))
-            (resp, error) = net('get', url, session = session, allow_redirects = True)
+            (resp, error) = net('get', url, session = session)
             if isinstance(error, NoContent):
                 if __debug__: log('server returned a "no content" code')
-                return ''
+                return []
             elif error:
                 raise error
             elif resp == None:
                 raise InternalError('Unexpected network return value')
             else:
                 content = str(resp.content)
-                return content if content.find('This record has no copies.') < 0 else ''
+                if not content or content.find('This record has no copies.') >= 0:
+                    warn('Unexpectedly empty holdings page for TIND id {}', tind_id)
+                    return []
+                soup = BeautifulSoup(content, features='lxml')
+                tables = soup.body.find_all('table')
+                if len(tables) >= 2:
+                    rows = tables[1].find_all('tr')
+                    for row in rows[1:]:        # Skip the heading row.
+                        columns = row.find_all('td')
+                        barcode = barcode_from_link(columns[0].input)
+                        location = columns[3].text
+                        status = columns[7].text
+                        holdings.append(Holding(barcode, status, location))
+                if __debug__: log('holdings for {} = {}', tind_id, holdings)
+                return holdings
         except Exception as err:
             details = 'exception connecting to tind.io: {}'.format(err)
             alert_fatal('Failed to connect -- try again later', details)
             raise ServiceFailure(details)
+
+
+    def filled_record(self, json_dict):
+        '''Returns a new instance of ItemRecord filled out using the data in
+        the JSON dictionary 'json_dict', which is assumed to contain the fields
+        in the kind of JSON record returned by the TIND ajax calls we make.
+        '''
+        if __debug__: log('creating record for {}', json_dict['barcode'])
+        (title, author)      = title_and_author(json_dict['title'])
+        r                    = ItemRecord()
+        r.item_title         = title
+        r.item_author        = author
+        r.item_barcode       = json_dict['barcode']
+        r.item_tind_id       = json_dict['id_bibrec']
+        r.item_call_number   = json_dict['call_no']
+        r.item_copy_number   = json_dict['description']
+        r.item_location_name = json_dict['location_name']
+        r.item_location_code = json_dict['location_code']
+        r.item_status        = json_dict['status']
+        r.item_loan_period   = json_dict['loan_period']
+        r.item_type          = json_dict['item_type']
+        r.holds_count        = json_dict['number_of_requests']
+        r.date_created       = json_dict['creation_date']
+        r.date_modified      = json_dict['modification_date']
+        r.item_record_url    = 'https://caltech.tind.io/record/' + str(r.item_tind_id)
+        # Note: the value of ['links']['barcode'] is not the same as barcode
+        r.item_details_url   = 'https://caltech.tind.io' + json_dict['links']['barcode']
+        # Save the data we used in an extra field, in case it's useful.
+        r._orig_data = json_dict
+        return r
 
 
 # Miscellaneous utilities.
 # .............................................................................
 
+def title_and_author(title_string):
+    '''Return a tuple of (title, author) extracted from the single string
+    'title_string', which is assumed to be the value of the 'title' field from
+    a TIND json record for an item.'''
+    author_text = ''
+    item_title = ''
+    if title_string.find(' / ') > 0:
+        start = title_string.find(' / ')
+        item_title = title_string[:start].strip()
+        author_text = title_string[start + 3:].strip()
+    elif title_string.find('[by]') > 0:
+        start = title_string.find('[by]')
+        item_title = title_string[:start].strip()
+        author_text = title_string[start + 5:].strip()
+    elif title_string.rfind(', by') > 0:
+        start = title_string.rfind(', by')
+        item_title = title_string[:start].strip()
+        author_text = title_string[start + 5:].strip()
+    else:
+        item_title = title_string
+    return (item_title, first_author(author_text))
+
+
 def first_author(author_text):
     # Preprocessing for some inconsistent cases.
+    if author_text == '':
+        return ''
     if author_text.endswith('.'):
         author_text = author_text[:-1]
     if author_text.startswith('by'):

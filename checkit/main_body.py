@@ -14,6 +14,8 @@ is open-source software released under a 3-clause BSD license.  Please see the
 file "LICENSE" for more information.
 '''
 
+from   collections import OrderedDict
+from   copy import deepcopy
 import csv
 import os
 import os.path as path
@@ -24,27 +26,33 @@ from .debug import log
 from .exceptions import *
 from .files import readable, writable, file_in_use, rename_existing
 from .network import network_available
-from .tind import Tind, TindRecord
+from .record import ItemRecord
+from .tind import Tind
 from .ui import inform, warn, alert, alert_fatal, file_selection
 
 
 # Global constants.
 # .............................................................................
+# The order of the list of output columns in _OUTPUT_COLUMNS determines the
+# order of the columns written in the output spreadsheet.
 
-# This maps record fields to the columns we want to put them in the output CSV.
-# If the field is not listed here, it's not written out
-
-_COL_INDEX = {
-    'item_barcode'         : 0,
-    'item_loan_status'     : 1,
-    'item_call_number'     : 2,
-    'item_copy_number'     : 3,
-    'item_location_code'   : 4,
-    'item_location_name'   : 5,
-    'item_tind_id'         : 6,
-    'item_type'            : 7,
-    'holdings_total'       : 8,
-}
+OUTPUT_COLUMNS = OrderedDict([
+    ('Barcode',        lambda record, copies: record.item_barcode),
+    ('Status',         lambda record, copies: record.item_status),
+    ('Call number',    lambda record, copies: record.item_call_number),
+    ('Copy number',    lambda record, copies: record.item_copy_number),
+    ('Location code',  lambda record, copies: record.item_location_code),
+    ('Location name',  lambda record, copies: record.item_location_name),
+    ('TIND id',        lambda record, copies: record.item_tind_id),
+    ('Item type',      lambda record, copies: record.item_type),
+    ('Holdings total', lambda record, copies: len(copies))
+])
+'''
+Ordered dictionary of the fields to write out in the CSV output file.
+The keys are the column titles, and the values are functions that are
+handed two arguments: the current record, and a dictionary of Holding items
+representing the copies of that item held in the Caltech Libraries.
+'''
 
 
 # Class definitions.
@@ -116,7 +124,7 @@ class MainBody(Thread):
         if not readable(infile):
             alert('Cannot read file: {}'.format(infile))
             return
-        if not self._file_contains_barcodes(infile):
+        if not file_contains_barcodes(infile):
             details = 'File does not appear to contain barcodes: {}'.format(infile)
             alert('Bad input file', details = details)
             return
@@ -124,7 +132,7 @@ class MainBody(Thread):
         barcode_list = []
         inform('Reading file {} ...', infile)
         with open(infile, mode="r") as f:
-            barcode_list = [row[0] for row in csv.reader(f) if row and row[0].isdigit()]
+            barcode_list = [row[0] for row in csv.reader(f) if is_barcode(row[0])]
 
         # Query TIND for the records matching the barcodes --------------------
 
@@ -132,6 +140,7 @@ class MainBody(Thread):
         try:
             tind = Tind(self._access)
             records = tind.records(barcode_list)
+            holdings = tind.holdings(records)
         except (ServiceFailure, NetworkFailure) as ex:
             alert_fatal("Can't connect to TIND -- try later", details = str(ex))
             return
@@ -140,12 +149,11 @@ class MainBody(Thread):
         # list may have duplicates.  The following puts the records in the
         # same order as our original barcode_list & puts None for missing
         # records.  The loop is O(n^2), but our lists are short, so no biggie.
-
         records_sorted = []
         for barcode in barcode_list:
-            # FIXME: will end up printing wrong barcode
-            rec = next((r for r in records if barcode in r.holdings_barcodes), None)
+            rec = next((r for r in records if r.item_barcode == barcode), None)
             records_sorted.append(rec)
+
 
         # Write the output ----------------------------------------------------
 
@@ -171,45 +179,44 @@ class MainBody(Thread):
 
         inform('Writing file {} ...', outfile)
         with open(outfile, 'w') as f:
-            writer = csv.writer(f, delimiter = ',')
-            writer.writerow(self._column_headings_list())
+            sheet = csv.writer(f, delimiter = ',')
+            sheet.writerow(OUTPUT_COLUMNS.keys())
             for idx, rec in enumerate(records_sorted):
-                if rec is not None:
-                    writer.writerow(self._row_for_record(rec))
-                    if rec.holdings_total > 1:
-                        for other_rec in (rec.copies_not_on_shelf or []):
-                            if other_rec.item_barcode != rec.item_barcode:
-                                writer.writerow(self._row_for_record(other_rec))
-                else:
-                    writer.writerow(self._blank_row_for_barcode(barcode_list[idx]))
+                if rec is None:
+                    sheet.writerow(row_for_missing(barcode_list[idx]))
+                    continue
+                copies = holdings.get(rec, [])
+                sheet.writerow(row_for_record(rec, copies))
+                others = [c for c in copies if c.location == rec.item_location_name
+                          and c.barcode != rec.item_barcode and c.status != 'on shelf']
+                for held in others:
+                    other = deepcopy(rec)
+                    other.item_barcode = held.barcode
+                    other.status = held.status
+                    sheet.writerow(row_for_record(other, copies))
         inform('Finished writing output.')
 
+
+# Miscellaneous utility functions
+# .............................................................................
 
-    def _column_headings_list(self):
-        # Need to be careful to put them in the order that is defined by the
-        # values in _COL_INDEX.  Don't just do a simple list comprehension.
-        titles_list = ['']*len(_COL_INDEX)
-        for field in _COL_INDEX.keys():
-            titles_list[_COL_INDEX[field]] = TindRecord.field_title(field)
-        return titles_list
+def is_barcode(text):
+    return text and (text.isdigit() or text.startswith('nobarcode'))
 
 
-    def _row_for_record(self, record):
-        row = ['']*len(_COL_INDEX)
-        for field in _COL_INDEX.keys():
-            row[_COL_INDEX[field]] = getattr(record, field)
-        return row
-
-
-    def _blank_row_for_barcode(self, barcode):
-        row = [barcode] + ['n/a']*(len(_COL_INDEX) - 1)
-        return row
-
-
-    def _file_contains_barcodes(self, input_file):
-        with open(input_file, 'r') as f:
+def file_contains_barcodes(input_file):
+    with open(input_file, 'r') as f:
+        line = f.readline().strip().strip(',')
+        # First line of a CSV file might be column headers, so skip it.
+        if not line.isdigit() and not line.startswith('nobarcode'):
             line = f.readline().strip().strip(',')
-            # First line of a CSV file might be column headers, so skip it.
-            if not line.isdigit() and not line.startswith('nobarcode'):
-                line = f.readline().strip().strip(',')
-            return line.isdigit() or line.startswith('nobarcode')
+        return is_barcode(line)
+
+
+def row_for_record(record, copies):
+    return [value(record, copies) for value in OUTPUT_COLUMNS.values()]
+
+
+def row_for_missing(barcode):
+    '''Returns a list with the barcode and 'n/a' for all the columns.'''
+    return [barcode] + ['n/a']*(len(OUTPUT_COLUMNS) - 1)
