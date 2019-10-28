@@ -140,7 +140,7 @@ class MainBody(Thread):
         try:
             tind = Tind(self._access)
             records = tind.records(barcode_list)
-            holdings = tind.holdings(records)
+            holdings = tind.holdings([record.item_tind_id for record in records])
         except (ServiceFailure, NetworkFailure) as ex:
             alert_fatal("Can't connect to TIND -- try later", details = str(ex))
             return
@@ -185,7 +185,7 @@ class MainBody(Thread):
                 if rec is None:
                     sheet.writerow(row_for_missing(barcode_list[idx]))
                     continue
-                copies = holdings.get(rec, [])
+                copies = holdings.get(rec.item_tind_id, [])
                 sheet.writerow(row_for_record(rec, copies))
                 others = [c for c in copies if c.location == rec.item_location_name
                           and c.barcode != rec.item_barcode and c.status != 'on shelf']
