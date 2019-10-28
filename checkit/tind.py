@@ -65,12 +65,13 @@ class Tind(object):
     # Session created from the user log in.
     _session = None
 
-    # Cache of record objects created, indexed by barcode.  We may end up
-    # getting records in different ways, so we want to avoid recreating objects.
+    # Cache of record objects created, indexed by barcode.  This is only
+    # useful if Tind.records(...) gets called more than once, in which case it
+    # may save time and network calls.
     _cache = {}
 
-    # Track the holdings for a given item.  This is a dictionary indexed by
-    # ItemRecord objects, and each value is a list of Holding named tuples,
+    # Track the holdings for a given tind record.  This is a dictionary
+    # indexed by tind id, and each value is a list of Holding named tuples,
     # one tuple for each copy of the item according to Caltech.tind.io.
     _holdings = {}
 
@@ -95,7 +96,11 @@ class Tind(object):
             json_data = self._tind_json(self._session, to_get)
             if json_data:
                 if __debug__: log('received {} records from tind.io', len(json_data))
-                records_list += [self.filled_record(r) for r in json_data]
+                for json_record in json_data:
+                    record = self.filled_record(json_record)
+                    if __debug__: log('caching ItemRecord for {}', record.item_barcode)
+                    self._cache[record.item_barcode] = record
+                    records_list.append(record)
             else:
                 # This means we have a problem.
                 details = 'Caltech.tind.io returned an empty result for our query'
@@ -105,25 +110,27 @@ class Tind(object):
         return records_list
 
 
-    def holdings(self, records_list):
-        '''Takes a list of ItemRecords, and returns a dictionary where the keys
-        are ItemRecords and the values are lists of Holding tuples.  The list
+    def holdings(self, tind_id_list):
+        '''Takes a list of TIND id's, and returns a dictionary where the keys
+        are TIND id's and the values are lists of Holding tuples.  The list
         thereby describes the status (on shelf, lost, etc.) and location of
-        each copy of the item described by the ItemRecord.
+        each copy of the item identified by that TIND item record.
         '''
         holdings_dict = {}
         to_get = []
-        for record in records_list:
+        for id in tind_id_list:
             # Check the cache in case already have holdings from a previous call.
-            if record in self._holdings:
-                if __debug__: log('returning stored holdings for {}', record)
-                holdings_dict[record] = self._holdings[record]
+            if id in self._holdings:
+                if __debug__: log('returning stored holdings for {}', id)
+                holdings_dict[id] = self._holdings[id]
             else:
-                to_get.append(record)
+                to_get.append(id)
         if to_get:
             if __debug__: log('will ask tind about {} holdings', len(to_get))
-            for record in [r for r in to_get if r not in holdings_dict]:
-                holdings_dict[record] = self._tind_holdings(self._session, record)
+            for tind_id in [id for id in to_get if id not in holdings_dict]:
+                holdings_dict[tind_id] = self._tind_holdings(self._session, tind_id)
+                if __debug__: log('caching holdings for {}', tind_id)
+                self._holdings[tind_id] = holdings_dict[tind_id]
         if __debug__: log('returning {} records', len(holdings_dict))
         return holdings_dict
 
@@ -336,17 +343,15 @@ class Tind(object):
         if len(results['data']) != total_records:
             details = 'Expected {} records but received {}'.format(
                 total_records, len(results['data']))
-            alert_fatal('TIND returned unexpected number of items',
-                                 details = details)
+            alert_fatal('TIND returned unexpected number of items', details = details)
             raise ServiceFailure('TIND returned unexpected number of items')
         if __debug__: log('succeeded in getting data via ajax')
         return results['data']
 
 
-    def _tind_holdings(self, session, record):
+    def _tind_holdings(self, session, tind_id):
         '''Returns a list of Holding tuples.
         '''
-        tind_id = record.item_tind_id
         url = 'https://caltech.tind.io/record/{}/holdings'.format(tind_id)
         holdings = []
         try:
