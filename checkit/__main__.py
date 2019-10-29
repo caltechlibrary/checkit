@@ -47,7 +47,58 @@ from checkit.network import network_available
 def main(no_color = False, no_gui = False, input_csv = 'I', no_keyring = False,
          output_csv = 'O', password = 'P', quiet = False, user = 'U',
          version = False, debug = 'OUT'):
-    '''Check It!'''
+    '''Takes a file of barcodes and gets info about them from caltech.tind.io.
+
+By default, Check It! will start a graphical user interface (GUI), unless
+given the command-line option -G (or /G on Windows).  When running in GUI
+mode, Check It! first opens a dialog box for an input file.  This file can be
+a CSV file with one barcode per line, or even a plain text file with one
+barcode per line.  Next, it will ask the user for their Caltech Access user
+name and password, and subsequently, gather info from Caltech.tind.io.  It
+will finish by presenting the user with one more file dialog, this time to
+create a destination output file where the results will be written.
+
+When started with the -G option (/G on Windows), Check It! will not start
+the GUI, and instead, begin by asking for the input file interactively on the
+command line.  If given the command-line option -i (or /i on Windows)
+followed by a file path name, it will use that file as the input instead of
+asking the user.
+
+Next, it will ask the user for a Caltech Access user name and password.  By
+default, Check It! uses the operating system's keyring/keychain functionality
+to get a user name and password.  If the information does not exist from a
+previous run of checkit, it will query the user interactively for the user
+name and password, and unless the -K argument (/K on Windows) is given,
+store them in the user's keyring/keychain so that it does not have to ask
+again in the future.  It is possible to supply the information directly on
+the command line using the -u and -p options (or /u and /p on
+Windows), but this is discouraged because it is insecure on multiuser
+computer systems.
+
+Once it has login credentials, Check It! gets to work contacting
+Caltech.tind.io to gather information about each barcode given in the input
+file.  (This may take some time if there are a lot of barcodes to process.)
+
+When it is done, it Check It! ask the user for a destination output file
+where the results will be written.  If given the command-line option -o (or
+/o on Windows) followed by a file path name, it will instead use that file
+as the output destination.  The format of the output is the same as that
+described in the section for the GUI interface above.
+
+When running in command-line mode, Check It! produces color-coded diagnostic
+output as it runs, by default.  However, some terminals or terminal
+configurations may make it hard to read the text with colors, so Check It!
+offers the -C option (/C on Windows) to turn off colored output.
+
+If given the -@ argument (/@ on Windows), this program will output a detailed
+trace of what it is doing, and will also drop into a debugger upon the
+occurrence of any errors.  The debug trace will be written to the given
+destination, which can be a dash character (-) to indicate console output, or
+a file path.
+
+If given the -V option (/V on Windows), this program will print the version
+and other information, and exit without doing anything else.
+'''
 
     # Initial setup -----------------------------------------------------------
 
