@@ -13,15 +13,15 @@ import sys
 
 # The addition of setup.cfg is so that our __init__.py code can work even
 # when bundled into the PyInstaller-created application.
-data_files = [ ('checkit/data/help.html', 'checkit/data'),
-               ('setup.cfg',              'checkit/data') ]
+data_files = [ ('checkit\data\help.html', 'checkit\data'),
+               ('setup.cfg',              'checkit\data') ]
 
 # The "colorful" package has a data file that doesn't get picked up
 # automatically, so we have to deal with it ourselves.
 
 colorful_package = importlib.import_module('colorful')
 colorful_path = path.dirname(colorful_package.__file__)
-data_files += [(os.path.join(colorful_path, 'data', 'rgb.txt'), 'colorful/data')]
+data_files += [(path.join(colorful_path, 'data', 'rgb.txt'), 'colorful\data')]
 
 # The rest is pretty normal PyInstaller stuff.
 
