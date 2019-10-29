@@ -204,12 +204,15 @@ def net(get_or_post, url, session = None, polling = False, recursing = 0, **kwar
     try:
         req = timed_request(get_or_post, url, session, allow_redirects = True, **kwargs)
     except requests.exceptions.ConnectionError as ex:
+        if __debug__: log('got network exception: {}', str(ex))
         if recursing >= _MAX_RECURSIVE_CALLS:
+            if __debug__: log('returning NetworkFailure')
             return (req, NetworkFailure(addurl('Too many connection errors')))
         arg0 = ex.args[0]
         if isinstance(arg0, urllib3.exceptions.MaxRetryError):
             if __debug__: log(str(arg0))
             original = unwrapped_urllib3_exception(arg0)
+            if __debug__: log('returning NetworkFailure')
             if isinstance(original, str) and 'unreacheable' in original:
                 return (req, NetworkFailure(addurl('Unable to connect to server')))
             elif network_available():
@@ -220,23 +223,30 @@ def net(get_or_post, url, session = None, polling = False, recursing = 0, **kwar
               and arg0.args and isinstance(args0.args[1], ConnectionResetError)):
             if __debug__: log('net() got ConnectionResetError; will recurse')
             sleep(1)                    # Sleep a short time and try again.
+            if __debug__: log('doing recursive call #{}', recursing + 1)
             return net(get_or_post, url, session, polling, recursing + 1, **kwargs)
         else:
+            if __debug__: log('returning NetworkFailure')
             return (req, NetworkFailure(str(ex)))
     except requests.exceptions.ReadTimeout as ex:
         if network_available():
+            if __debug__: log('returning ServiceFailure')
             return (req, ServiceFailure(addurl('Timed out reading data from server')))
         else:
+            if __debug__: log('returning NetworkFailure')
             return (req, NetworkFailure(addurl('Timed out reading data over network')))
     except requests.exceptions.InvalidSchema as ex:
+        if __debug__: log('returning NetworkFailure')
         return (req, NetworkFailure(addurl('Unsupported network protocol')))
     except Exception as ex:
+        if __debug__: log('returning exception')
         return (req, ex)
 
     # Interpret the response.  Note that the requests library handles code 301
     # and 302 redirects automatically, so we don't need to do it here.
     code = req.status_code
     error = None
+    if __debug__: log(addurl('server returned http code {}'.format(code)))
     if code == 400:
         error = RequestError('Server rejected the request')
     elif code in [401, 402, 403, 407, 451, 511]:
@@ -252,6 +262,7 @@ def net(get_or_post, url, session = None, polling = False, recursing = 0, **kwar
             pause = 5 * (recursing + 1)   # +1 b/c we start with recursing = 0.
             if __debug__: log('rate limit hit -- sleeping {}', pause)
             sleep(pause)                  # 5 s, then 10 s, then 15 s, etc.
+            if __debug__: log('doing recursive call #{}', recursing + 1)
             return net(get_or_post, url, session, polling, recursing + 1, **kwargs)
         error = RateLimitExceeded('Server blocking further requests due to rate limits')
     elif code == 503:
@@ -260,6 +271,7 @@ def net(get_or_post, url, session = None, polling = False, recursing = 0, **kwar
         error = ServiceFailure('Server error (HTTP code {})'.format(code))
     elif not (200 <= code < 400):
         error = NetworkFailure("Unable to resolve {}".format(url))
+    if __debug__: log('returning result with error {}', error)
     return (req, error)
 
 
