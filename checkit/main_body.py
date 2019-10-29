@@ -80,19 +80,20 @@ class MainBody(Thread):
         # In normal operation, this method returns after things are done and
         # leaves it to the user to exit the application via the control GUI.
         # If exceptions occur, we capture the stack context for the caller.
+        if __debug__: log('starting')
         try:
             self._do_main_work()
         except (KeyboardInterrupt, UserCancelled) as ex:
             if __debug__: log('got {} exception', type(ex).__name__)
             inform('User cancelled operation -- stopping.')
-            return
         except Exception as ex:
             if __debug__: log('exception in main body: {}', str(ex))
             self.exception = sys.exc_info()
             details = 'An exception occurred in {}: {}'.format(__package__, str(ex))
             alert_fatal('Error occurred during execution', details = details)
             return
-        if __debug__: log('run() finished')
+        if __debug__: log('finished')
+        inform('\nYou may quit the program when ready.')
 
 
     def stop(self):
