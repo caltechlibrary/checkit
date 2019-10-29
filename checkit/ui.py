@@ -313,12 +313,12 @@ class CLI(UIBase, Styled):
         defaults but the password is not shown to the user.
         '''
         try:
-            text = (prompt + ' [default: ' + user + ']: ') if user else (prompt + ':')
+            text = (prompt + ' [default: ' + user + ']: ') if user else (prompt + ': ')
             input_user = input(text)
             if len(input_user) == 0:
                 input_user = user
-            hidden = ' [default: ' + '*'*len(pswd) + ']' if pswd else None
-            text = 'Password for "' + user + '"' + hidden + ': '
+            hidden = ' [default: ' + '*'*len(pswd) + ']' if pswd else ''
+            text = 'Password' + (' for "' + user + '"' if user else '') + hidden + ': '
             input_pswd = password(text)
             if len(input_pswd) == 0:
                 input_pswd = pswd
