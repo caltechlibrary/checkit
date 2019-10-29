@@ -12,6 +12,10 @@ REM   2. cd into this directory
 REM   3. run "make.bat"
 REM ===========================================================================
 
+ECHO Making sure Python requirements are installed
+
+python -m pip install -r requirements.txt
+
 ECHO Removing "dist" and "build" subdirectories.
 
 RD /S /Q dist build
