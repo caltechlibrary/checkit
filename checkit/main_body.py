@@ -93,7 +93,6 @@ class MainBody(Thread):
             alert_fatal('Error occurred during execution', details = details)
             return
         if __debug__: log('finished')
-        inform('\nYou may quit the program when ready.')
 
 
     def stop(self):
