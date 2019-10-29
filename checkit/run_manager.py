@@ -14,6 +14,7 @@ is open-source software released under a 3-clause BSD license.  Please see the
 file "LICENSE" for more information.
 '''
 
+from pubsub import pub
 from threading import Thread
 
 from .debug import set_debug, log
@@ -36,6 +37,11 @@ from .debug import set_debug, log
 
 class RunManager():
     '''Manager for overall program execution.'''
+
+    def __init__(self):
+        # Listen to stop messages.
+        pub.subscribe(self.stop, "stop")
+
 
     def run(self, ui, worker):
         self._ui = ui

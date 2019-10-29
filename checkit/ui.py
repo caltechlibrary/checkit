@@ -344,9 +344,6 @@ class GUI(UIBase):
         self._queue = Queue()
         self._response = None
 
-        # Listen to stop messages.
-        pub.subscribe(self.stop, "stop")
-
 
     def start(self):
         '''Start the user interface.'''
