@@ -1,7 +1,8 @@
-Change log for REPOSITORY
-=========================
+Change log for Check It!
+========================
 
-Version 0.1
------------
+Version 1.0.0
+-------------
 
-* Work in progress.
+First release.
+
