@@ -1,6 +1,10 @@
 '''
 __main__: main command-line interface to Check It!
 
+Check It! is a program to help Caltech Librarians perform inventory.  It
+takes a list of bar codes and generates a CSV file containing information
+about the items drawn from Caltech's TIND server.
+
 Authors
 -------
 

@@ -1,3 +1,18 @@
+'''
+app_frame.py: wxPython GUI definition for Check It!
+
+Authors
+-------
+
+Michael Hucka <mhucka@caltech.edu> -- Caltech Library
+
+Copyright
+---------
+
+Copyright (c) 2018-2019 by the California Institute of Technology.  This code
+is open-source software released under a 3-clause BSD license.  Please see the
+file "LICENSE" for more information.
+'''
 
 import os
 import os.path as path
