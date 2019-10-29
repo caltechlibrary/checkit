@@ -21,6 +21,9 @@ import sys
 if sys.platform.startswith('win'):
     import keyring.backends
     from keyring.backends.Windows import WinVaultKeyring
+if sys.platform.startswith('darwin'):
+    import keyring.backends
+    from keyring.backends.OS_X import Keyring
 
 
 # Credentials/keyring functions
@@ -86,6 +89,8 @@ def keyring_credentials(service, user=None):
     '''
     if sys.platform.startswith('win'):
         keyring.set_keyring(WinVaultKeyring())
+    if sys.platform.startswith('darwin'):
+        keyring.set_keyring(Keyring())
     value = keyring.get_password(service, user if user else 'credentials')
     return _decoded(value) if value else (None, None, None, None)
 
@@ -98,6 +103,8 @@ def save_keyring_credentials(service, user, pswd, host=None, port=None):
     port = port if port else ''
     if sys.platform.startswith('win'):
         keyring.set_keyring(WinVaultKeyring())
+    if sys.platform.startswith('darwin'):
+        keyring.set_keyring(Keyring())
     keyring.set_password(service, 'credentials', _encoded(user, pswd, host, port))
 
 
