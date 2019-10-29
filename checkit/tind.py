@@ -33,7 +33,7 @@ from .ui import inform, warn, alert, alert_fatal, yes_reply
 # Helper data types.
 # -----------------------------------------------------------------------------
 
-Holding = namedtuple('Holding', 'barcode status location')
+Holding = namedtuple('Holding', 'barcode copy status location')
 Holding.__doc__ ='''
 Named tuple describing the status (as a string such as 'on shelf' or 'lost')
 and expected location for a given barcode.
@@ -375,10 +375,12 @@ class Tind(object):
                     rows = tables[1].find_all('tr')
                     for row in rows[1:]:        # Skip the heading row.
                         columns = row.find_all('td')
+                        call_no = columns[2].text
                         location = columns[3].text
+                        copy = columns[4].text
                         status = columns[7].text
                         barcode = columns[9].text
-                        holdings.append(Holding(barcode, status, location))
+                        holdings.append(Holding(barcode, copy, status, location))
                 if __debug__: log('holdings for {} = {}', tind_id, holdings)
                 return holdings
         except Exception as err:

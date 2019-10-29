@@ -192,6 +192,7 @@ class MainBody(Thread):
                 for held in others:
                     other = deepcopy(rec)
                     other.item_barcode = held.barcode
+                    other.item_copy_number = held.copy
                     other.item_status = held.status
                     sheet.writerow(row_for_record(other, copies))
         inform('Finished writing output.')
