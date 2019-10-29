@@ -362,7 +362,7 @@ class Tind(object):
                 return []
             elif error:
                 raise error
-            elif resp == None:
+            elif resp is None:
                 raise InternalError('Unexpected network return value')
             else:
                 content = str(resp.content)
@@ -375,15 +375,15 @@ class Tind(object):
                     rows = tables[1].find_all('tr')
                     for row in rows[1:]:        # Skip the heading row.
                         columns = row.find_all('td')
-                        barcode = barcode_from_link(columns[0].input)
                         location = columns[3].text
                         status = columns[7].text
+                        barcode = columns[9].text
                         holdings.append(Holding(barcode, status, location))
                 if __debug__: log('holdings for {} = {}', tind_id, holdings)
                 return holdings
         except Exception as err:
             details = 'exception connecting to tind.io: {}'.format(err)
-            alert_fatal('Failed to connect -- try again later', details)
+            alert_fatal('Failed to connect -- try again later', details = details)
             raise ServiceFailure(details)
 
 
@@ -442,18 +442,3 @@ def first_author(author_text):
         return HumanName(first_author).last
     except:
         return first_author
-
-
-def barcode_from_link(td):
-    # This expects an element from a Tind holdings table that looks like this:
-    # <input class="bibcircbutton" onmouseout="this.className=\'bibcircbutton\'"
-    #        onclick="location.href=\'https://caltech.tind.io/record/750529/holdings/request?barcode=35047019258938&amp;ln=en\'" 
-    #        ... />
-    onclick = td['onclick']
-    start = onclick.find('barcode=')
-    if start < 0:
-        return ''
-    start += 8
-    end = onclick.find('&', start)
-    end = len(onclick) if end < 1 else end
-    return onclick[start:end]
