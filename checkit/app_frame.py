@@ -131,8 +131,7 @@ class AppFrame(wx.Frame):
         if __debug__: log('got Exit/Cancel')
         self._cancel = True
         wx.BeginBusyCursor()
-        self.info_message('')
-        self.info_message('Stopping work – this may take a few moments ...')
+        self.info_message('\nStopping work – this may take a few moments ...\n')
 
         # We can't call pub.sendMessage from this function, nor does it work
         # to call it using wx.CallAfter directly from this function: both
@@ -141,7 +140,6 @@ class AppFrame(wx.Frame):
         # this calling function returns before the thread calls 'quit'.
 
         def quitter():
-            sleep(1)
             if __debug__: log('sending message to quit')
             wx.CallAfter(pub.sendMessage, 'stop')
 
