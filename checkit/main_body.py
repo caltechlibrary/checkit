@@ -103,6 +103,8 @@ class MainBody(Thread):
 
 
     def _do_main_work(self):
+        '''Performs the core work of this program.'''
+
         # Set shortcut variables for better code readability below.
         infile  = self._infile
         outfile = self._outfile
@@ -202,10 +204,12 @@ class MainBody(Thread):
 # .............................................................................
 
 def is_barcode(text):
+    '''Returns True if the text string looks like a Caltech Library barcode.'''
     return text and (text.isdigit() or text.startswith('nobarcode'))
 
 
 def file_contains_barcodes(input_file):
+    '''Returns True if the given input_file appears to contain only barcodes.'''
     with open(input_file, 'r') as f:
         line = f.readline().strip().strip(',')
         # First line of a CSV file might be column headers, so skip it.
@@ -215,6 +219,7 @@ def file_contains_barcodes(input_file):
 
 
 def row_for_record(record, copies):
+    '''Returns a list of column values for the given ItemRecord 'record'.'''
     return [value(record, copies) for value in OUTPUT_COLUMNS.values()]
 
 

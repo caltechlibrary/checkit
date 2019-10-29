@@ -110,6 +110,10 @@ from .styled import Styled
 # such as "print()" are used in Python.
 
 def inform(text, *args):
+    '''Print an informational message to the user.  The 'text' can contain
+    string format placeholders such as "{}", and the additional arguments in
+    args are values to use in those placeholders.
+    '''
     ui = UI.instance()
     ui.inform(text, *args)
 
@@ -147,16 +151,27 @@ def alert_fatal(text, *args, **kwargs):
 
 
 def file_selection(type, purpose, pattern = '*'):
+    '''Returns the file selected by the user.  The value of 'type' should be
+    'open' if the reason for the request is to open a file for reading, and
+    'save' if the reason is to save a file.  The argument 'purpose' should be
+    a short text string explaining to the user why they're being asked for a
+    file.  The 'pattern' is a file pattern expression of the kind accepted by
+    wxPython FileDialog.
+    '''
     ui = UI.instance()
     return ui.file_selection(type, purpose, pattern)
 
 
 def login_details(prompt, user, password):
+    '''Asks the user for a login name and password.  The value of 'user' and
+    'password' will be used as initial values in the dialog.
+    '''
     ui = UI.instance()
     return ui.login_details(prompt, user, password)
 
 
 def yes_reply(question):
+    '''Returns True if the user replies 'yes' to the 'question'.'''
     ui = UI.instance()
     return ui.yes_reply(question)
 

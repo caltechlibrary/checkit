@@ -92,6 +92,7 @@ def datadir_path():
 
 
 def files_in_directory(dir, extensions = None):
+    '''Returns a list of the files in the directory 'dir'.'''
     if not path.isdir(dir):
         return []
     if not readable(dir):
@@ -106,6 +107,9 @@ def files_in_directory(dir, extensions = None):
 
 
 def filename_basename(file):
+    '''Returns the basename of 'file' (meaning the portion up to the period
+    preceding the extension).
+    '''
     parts = file.rpartition('.')
     if len(parts) > 1:
         return ''.join(parts[:-1]).rstrip('.')
@@ -114,6 +118,7 @@ def filename_basename(file):
 
 
 def filename_extension(file):
+    '''Returns the filename extension part of 'file'.'''
     parts = file.rpartition('.')
     if len(parts) > 1:
         return parts[-1].lower()
@@ -129,6 +134,9 @@ def alt_extension(filepath, ext):
 
 
 def filter_by_extensions(item_list, endings):
+    '''Returns a list of those strings in 'item_list' whose endings are one
+    of the endings in the list 'endings'.
+    '''
     if not item_list:
         return []
     if not endings:
@@ -216,6 +224,9 @@ def delete_existing(file):
 
 
 def file_in_use(file):
+    '''Returns True if the given 'file' appears to be in use.  Note: this only
+    works on Windows, currently.
+    '''
     if not path.exists(file):
         return False
     if sys.platform.startswith('win'):
@@ -229,13 +240,13 @@ def file_in_use(file):
 
 
 def copy_file(src, dst):
-    '''Copy a file from "src" to "dst".'''
+    '''Copies a file from "src" to "dst".'''
     if __debug__: log('copying file {} to {}', src, dst)
     shutil.copy2(src, dst, follow_symlinks = True)
 
 
 def open_file(file):
-    '''Open document with default application in Python.'''
+    '''Opens document with default application in Python.'''
     # Code originally from https://stackoverflow.com/a/435669/743730
     if __debug__: log('opening file {}', file)
     if sys.platform.startswith('darwin'):
@@ -247,7 +258,7 @@ def open_file(file):
 
 
 def open_url(url):
-    '''Open the given 'url' in a web browser using the current platform's
+    '''Opens the given 'url' in a web browser using the current platform's
     default approach.'''
     if __debug__: log('opening url {}', url)
     webbrowser.open(url)
