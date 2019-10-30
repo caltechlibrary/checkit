@@ -135,7 +135,8 @@ class MainBody(Thread):
         barcode_list = []
         inform('Reading file {} ...', infile)
         with open(infile, mode="r") as f:
-            barcode_list = [row[0] for row in csv.reader(f) if is_barcode(row[0])]
+            input_csv = csv.reader(f)
+            barcode_list = [row[0] for row in input_csv if row and is_barcode(row[0])]
 
         # Query TIND for the records matching the barcodes --------------------
 
