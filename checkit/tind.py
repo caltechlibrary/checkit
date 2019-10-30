@@ -16,7 +16,7 @@ file "LICENSE" for more information.
 
 from   collections import namedtuple
 from   iteration_utilities import grouper
-import json
+import ujson
 from   nameparser import HumanName
 import re
 import requests
@@ -325,28 +325,33 @@ class Tind(object):
                         'User-Agent'       : _USER_AGENT_STRING}
         try:
             if __debug__: log('posting ajax call to tind.io')
-            resp = session.post(ajax_url, headers = ajax_headers, json = payload)
+            (resp, error) = net('post', ajax_url, session = session,
+                                headers = ajax_headers, json = payload)
+            if isinstance(error, NoContent):
+                if __debug__: log('server returned a "no content" code')
+                return []
+            elif error:
+                raise error
+            elif resp is None:
+                raise InternalError('Unexpected network return value')
+            if __debug__: log('decoding results as json')
+            results = ujson.loads(resp.content)
+            if 'recordsTotal' not in results or 'data' not in results:
+                alert_fatal('Unexpected result from TIND AJAX call')
+                raise InternalError('Unexpected result from TIND AJAX call')
+            total_records = results['recordsTotal']
+            if __debug__: log('TIND says there are {} records', total_records)
+            if len(results['data']) != total_records:
+                details = 'Expected {} records but received {}'.format(
+                    total_records, len(results['data']))
+                alert_fatal('TIND returned unexpected number of items', details = details)
+                raise ServiceFailure('TIND returned unexpected number of items')
+            if __debug__: log('succeeded in getting data via ajax')
+            return results['data']
         except Exception as err:
-            details = 'exception doing AJAX call {}'.format(err)
+            details = 'exception doing AJAX call: {}'.format(err)
             alert_fatal('Unable to get data from TIND', details)
             raise ServiceFailure(details)
-        if resp.status_code != 200:
-            details = 'tind.io AJAX returned status {}'.format(resp.status_code)
-            alert_fatal('TIND failed to return data', details)
-            raise ServiceFailure(details)
-        results = resp.json()
-        if 'recordsTotal' not in results or 'data' not in results:
-            alert_fatal('Unexpected result from TIND AJAX call')
-            raise InternalError('Unexpected result from TIND AJAX call')
-        total_records = results['recordsTotal']
-        if __debug__: log('TIND says there are {} records', total_records)
-        if len(results['data']) != total_records:
-            details = 'Expected {} records but received {}'.format(
-                total_records, len(results['data']))
-            alert_fatal('TIND returned unexpected number of items', details = details)
-            raise ServiceFailure('TIND returned unexpected number of items')
-        if __debug__: log('succeeded in getting data via ajax')
-        return results['data']
 
 
     def _tind_holdings(self, session, tind_id):
