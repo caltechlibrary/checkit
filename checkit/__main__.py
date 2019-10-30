@@ -18,7 +18,6 @@ is open-source software released under a 3-clause BSD license.  Please see the
 file "LICENSE" for more information.
 '''
 
-import faulthandler
 import plac
 import sys
 
@@ -119,6 +118,7 @@ and other information, and exit without doing anything else.
 
     if debugging:
         set_debug(True, debug)
+        import faulthandler
         faulthandler.enable()
     if version:
         print_version()
