@@ -37,15 +37,16 @@ from .ui import inform, warn, alert, alert_fatal, file_selection
 # order of the columns written in the output spreadsheet.
 
 OUTPUT_COLUMNS = OrderedDict([
-    ('Barcode',        lambda record, copies: record.item_barcode),
-    ('Status',         lambda record, copies: record.item_status),
-    ('Call number',    lambda record, copies: record.item_call_number),
-    ('Copy number',    lambda record, copies: record.item_copy_number),
-    ('Location code',  lambda record, copies: record.item_location_code),
-    ('Location name',  lambda record, copies: record.item_location_name),
-    ('TIND id',        lambda record, copies: record.item_tind_id),
-    ('Item type',      lambda record, copies: record.item_type),
-    ('Holdings total', lambda record, copies: len(copies))
+    ('Flag',           lambda flag, record, copies: flag),
+    ('Barcode',        lambda flag, record, copies: record.item_barcode),
+    ('Status',         lambda flag, record, copies: record.item_status),
+    ('Call number',    lambda flag, record, copies: record.item_call_number),
+    ('Copy number',    lambda flag, record, copies: record.item_copy_number),
+    ('Location code',  lambda flag, record, copies: record.item_location_code),
+    ('Location name',  lambda flag, record, copies: record.item_location_name),
+    ('TIND id',        lambda flag, record, copies: record.item_tind_id),
+    ('Item type',      lambda flag, record, copies: record.item_type),
+    ('Holdings total', lambda flag, record, copies: len(copies))
 ])
 '''
 Ordered dictionary of the fields to write out in the CSV output file.
@@ -188,7 +189,7 @@ class MainBody(Thread):
                     sheet.writerow(row_for_missing(barcode_list[idx]))
                     continue
                 copies = holdings.get(rec.item_tind_id, [])
-                sheet.writerow(row_for_record(rec, copies))
+                sheet.writerow(row_for_record('original', rec, copies))
                 others = [c for c in copies if c.location == rec.item_location_name
                           and c.barcode != rec.item_barcode and c.status != 'on shelf']
                 for held in others:
@@ -196,7 +197,7 @@ class MainBody(Thread):
                     other.item_barcode = held.barcode
                     other.item_copy_number = held.copy
                     other.item_status = held.status
-                    sheet.writerow(row_for_record(other, copies))
+                    sheet.writerow(row_for_record('added', other, copies))
         inform('Finished writing output.')
 
 
@@ -218,11 +219,11 @@ def file_contains_barcodes(input_file):
         return is_barcode(line)
 
 
-def row_for_record(record, copies):
+def row_for_record(flag, record, copies):
     '''Returns a list of column values for the given ItemRecord 'record'.'''
-    return [value(record, copies) for value in OUTPUT_COLUMNS.values()]
+    return [value(flag, record, copies) for value in OUTPUT_COLUMNS.values()]
 
 
 def row_for_missing(barcode):
     '''Returns a list with the barcode and 'n/a' for all the columns.'''
-    return [barcode] + ['n/a']*(len(OUTPUT_COLUMNS) - 1)
+    return ['original', barcode] + ['n/a']*(len(OUTPUT_COLUMNS) - 1)
