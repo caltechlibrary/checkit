@@ -14,14 +14,14 @@ is open-source software released under a 3-clause BSD license.  Please see the
 file "LICENSE" for more information.
 '''
 
+from   bs4 import BeautifulSoup
 from   collections import namedtuple
-from   iteration_utilities import grouper
-import ujson
+import itertools
+import json as jsonlib
+from   lxml import html
 from   nameparser import HumanName
 import re
 import requests
-from lxml import html
-from bs4 import BeautifulSoup
 
 from .debug import log
 from .exceptions import *
@@ -335,7 +335,7 @@ class Tind(object):
             elif resp is None:
                 raise InternalError('Unexpected network return value')
             if __debug__: log('decoding results as json')
-            results = ujson.loads(resp.content)
+            results = resp.json()
             if 'recordsTotal' not in results or 'data' not in results:
                 alert_fatal('Unexpected result from TIND AJAX call')
                 raise InternalError('Unexpected result from TIND AJAX call')
@@ -449,3 +449,21 @@ def first_author(author_text):
         return HumanName(first_author).last
     except:
         return first_author
+
+
+def grouper(iterable, n):
+    '''Returns elements from 'iterable' in chunks of 'n'.'''
+
+    # This code was posted by user maxkoryukov on Stack Overflow at
+    # https://stackoverflow.com/a/8991553/743730
+    # I previously used grouper from iteration_utilities version 0.8.0, but
+    # that one turned out to have a serious bug: it returns a pointer to
+    # internal memory, and the first Python garbage collection sweep causes a
+    # segmentation fault.  I replaced it with this.
+
+    it = iter(iterable)
+    while True:
+       chunk = tuple(itertools.islice(it, n))
+       if not chunk:
+           return
+       yield chunk
