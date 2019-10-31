@@ -131,9 +131,9 @@ def net(get_or_post, url, session = None, polling = False, recursing = 0, **kwar
             if isinstance(original, str) and 'unreacheable' in original:
                 return (req, NetworkFailure(addurl('Unable to connect to server')))
             elif network_available():
-                raise NetworkFailure(addurl('Unable to resolve host'))
+                return (req, NetworkFailure(addurl('Unable to resolve host')))
             else:
-                raise NetworkFailure(addurl('Lost network connection with server'))
+                return (req, NetworkFailure(addurl('Lost network connection with server')))
         elif (isinstance(arg0, urllib3.exceptions.ProtocolError)
               and arg0.args and isinstance(args0.args[1], ConnectionResetError)):
             if __debug__: log('net() got ConnectionResetError; will recurse')
