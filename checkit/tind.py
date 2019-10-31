@@ -332,8 +332,6 @@ class Tind(object):
                 return []
             elif error:
                 raise error
-            elif resp is None:
-                raise InternalError('Unexpected network return value')
             if __debug__: log('decoding results as json')
             results = resp.json()
             if 'recordsTotal' not in results or 'data' not in results:
@@ -367,8 +365,6 @@ class Tind(object):
                 return []
             elif error:
                 raise error
-            elif resp is None:
-                raise InternalError('Unexpected network return value')
             else:
                 content = str(resp.content)
                 if not content or content.find('This record has no copies.') >= 0:
