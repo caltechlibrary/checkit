@@ -323,33 +323,28 @@ class Tind(object):
         ajax_headers = {'X-Requested-With' : 'XMLHttpRequest',
                         "Content-Type"     : "application/json",
                         'User-Agent'       : _USER_AGENT_STRING}
-        try:
-            if __debug__: log('posting ajax call to tind.io')
-            (resp, error) = net('post', ajax_url, session = session,
-                                headers = ajax_headers, json = payload)
-            if isinstance(error, NoContent):
-                if __debug__: log('server returned a "no content" code')
-                return []
-            elif error:
-                raise error
-            if __debug__: log('decoding results as json')
-            results = resp.json()
-            if 'recordsTotal' not in results or 'data' not in results:
-                alert_fatal('Unexpected result from TIND AJAX call')
-                raise InternalError('Unexpected result from TIND AJAX call')
-            total_records = results['recordsTotal']
-            if __debug__: log('TIND says there are {} records', total_records)
-            if len(results['data']) != total_records:
-                details = 'Expected {} records but received {}'.format(
-                    total_records, len(results['data']))
-                alert_fatal('TIND returned unexpected number of items', details = details)
-                raise ServiceFailure('TIND returned unexpected number of items')
-            if __debug__: log('succeeded in getting data via ajax')
-            return results['data']
-        except Exception as err:
-            details = 'exception doing AJAX call: {}'.format(err)
-            alert_fatal('Unable to get data from TIND', details)
-            raise ServiceFailure(details)
+        if __debug__: log('posting ajax call to tind.io')
+        (resp, error) = net('post', ajax_url, session = session,
+                            headers = ajax_headers, json = payload)
+        if isinstance(error, NoContent):
+            if __debug__: log('server returned a "no content" code')
+            return []
+        elif error:
+            raise error
+        if __debug__: log('decoding results as json')
+        results = resp.json()
+        if 'recordsTotal' not in results or 'data' not in results:
+            alert_fatal('Unexpected result from TIND AJAX call')
+            raise InternalError('Unexpected result from TIND AJAX call')
+        total_records = results['recordsTotal']
+        if __debug__: log('TIND says there are {} records', total_records)
+        if len(results['data']) != total_records:
+            details = 'Expected {} records but received {}'.format(
+                total_records, len(results['data']))
+            alert_fatal('TIND returned unexpected number of items', details = details)
+            raise ServiceFailure('TIND returned unexpected number of items')
+        if __debug__: log('succeeded in getting data via ajax')
+        return results['data']
 
 
     def _tind_holdings(self, session, tind_id):
@@ -357,37 +352,32 @@ class Tind(object):
         '''
         url = 'https://caltech.tind.io/record/{}/holdings'.format(tind_id)
         holdings = []
-        try:
-            inform('Getting holdings info from TIND for {} ...'.format(tind_id))
-            (resp, error) = net('get', url, session = session)
-            if isinstance(error, NoContent):
-                if __debug__: log('server returned a "no content" code')
-                return []
-            elif error:
-                raise error
-            else:
-                content = str(resp.content)
-                if not content or content.find('This record has no copies.') >= 0:
-                    warn('Unexpectedly empty holdings page for TIND id {}', tind_id)
-                    return []
-                soup = BeautifulSoup(content, features='lxml')
-                tables = soup.body.find_all('table')
-                if len(tables) >= 2:
-                    rows = tables[1].find_all('tr')
-                    for row in rows[1:]:        # Skip the heading row.
-                        columns = row.find_all('td')
-                        call_no = columns[2].text
-                        location = columns[3].text
-                        copy = columns[4].text
-                        status = columns[7].text
-                        barcode = columns[9].text
-                        holdings.append(Holding(barcode, copy, status, location))
-                if __debug__: log('holdings for {} = {}', tind_id, holdings)
-                return holdings
-        except Exception as err:
-            details = 'exception connecting to tind.io: {}'.format(err)
-            alert_fatal('Failed to connect -- try again later', details = details)
-            raise ServiceFailure(details)
+        inform('Getting holdings info from TIND for {} ...'.format(tind_id))
+        (resp, error) = net('get', url, session = session)
+        if isinstance(error, NoContent):
+            if __debug__: log('server returned a "no content" code')
+            return []
+        elif error:
+            raise error
+        if __debug__: log('scraping web page for holdings of {}', tind_id)
+        content = str(resp.content)
+        if not content or content.find('This record has no copies.') >= 0:
+            warn('Unexpectedly empty holdings page for TIND id {}', tind_id)
+            return []
+        soup = BeautifulSoup(content, features='lxml')
+        tables = soup.body.find_all('table')
+        if len(tables) >= 2:
+            rows = tables[1].find_all('tr')
+            for row in rows[1:]:        # Skip the heading row.
+                columns = row.find_all('td')
+                call_no = columns[2].text
+                location = columns[3].text
+                copy = columns[4].text
+                status = columns[7].text
+                barcode = columns[9].text
+                holdings.append(Holding(barcode, copy, status, location))
+        if __debug__: log('holdings for {} = {}', tind_id, holdings)
+        return holdings
 
 
 # Miscellaneous utilities.
