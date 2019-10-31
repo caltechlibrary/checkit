@@ -186,7 +186,8 @@ def net(get_or_post, url, session = None, polling = False, recursing = 0, **kwar
         error = ServiceFailure('Server error (HTTP code {})'.format(code))
     elif not (200 <= code < 400):
         error = NetworkFailure("Unable to resolve {}".format(url))
-    if __debug__: log('returning result with error {}', error)
+    if __debug__: log('returning result {}',
+                      'with error {}'.format(error) if error else 'without error')
     return (req, error)
 
 
