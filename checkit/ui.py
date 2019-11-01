@@ -436,10 +436,10 @@ class GUI(UIBase):
         message = text.format(*args)
         details = kwargs['details'] if 'details' in kwargs else ''
         if wx.GetApp().TopWindow:
-            wx.CallAfter(self._show_dialog, message, details, 'error')
+            wx.CallAfter(self._show_alert_dialog, message, details, 'error')
         else:
             # The app window is gone, so wx.CallAfter won't work.
-            self._show_dialog(message, details, 'error')
+            self._show_alert_dialog(message, details, 'error')
         self._wait()
 
 
@@ -455,10 +455,10 @@ class GUI(UIBase):
         message = text.format(*args)
         details = kwargs['details'] if 'details' in kwargs else ''
         if wx.GetApp().TopWindow:
-            wx.CallAfter(self._show_dialog, message, details, 'fatal')
+            wx.CallAfter(self._show_alert_dialog, message, details, 'fatal')
         else:
             # The app window is gone, so wx.CallAfter won't work.
-            self._show_dialog(message, details, 'fatal')
+            self._show_alert_dialog(message, details, 'fatal')
         self._wait()
         wx.CallAfter(pub.sendMessage, 'stop')
 
@@ -488,7 +488,7 @@ class GUI(UIBase):
         self._queue.put(True)
 
 
-    def _show_dialog(self, text, details, severity = 'error'):
+    def _show_alert_dialog(self, text, details, severity = 'error'):
         if __debug__: log('showing message dialog')
         frame = self._current_frame()
         if severity == 'fatal':
