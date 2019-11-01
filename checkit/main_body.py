@@ -124,11 +124,10 @@ class MainBody(Thread):
             alert('No input file')
             return
         if not readable(infile):
-            alert('Cannot read file: {}'.format(infile))
+            alert('Cannot read file: {}', infile)
             return
         if not file_contains_barcodes(infile):
-            details = 'File does not appear to contain barcodes: {}'.format(infile)
-            alert('Bad input file', details = details)
+            alert('File does not appear to contain barcodes: {}', infile)
             return
 
         barcode_list = []
@@ -170,11 +169,10 @@ class MainBody(Thread):
             rename_existing(outfile)
         if file_in_use(outfile):
             details = '{} appears to be open in another program'.format(outfile)
-            alert('Cannot write output file', details = details)
+            alert('Cannot write output file: {}', details)
             return
         if path.exists(outfile) and not writable(outfile):
-            details = 'You may not have write permissions to {} '.format(outfile)
-            alert('Cannot write output file', details = details)
+            alert('You may not have write permissions to {}', outfile)
             return
 
         if not outfile.endswith('.csv'):
