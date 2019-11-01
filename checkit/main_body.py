@@ -90,8 +90,7 @@ class MainBody(Thread):
         except Exception as ex:
             if __debug__: log('exception in main body: {}', str(ex))
             self.exception = sys.exc_info()
-            details = 'An exception occurred in {}: {}'.format(__package__, str(ex))
-            alert_fatal('Error occurred during execution', details = details)
+            alert_fatal('Error occurred during execution', details = str(ex))
             return
         if __debug__: log('finished')
 
