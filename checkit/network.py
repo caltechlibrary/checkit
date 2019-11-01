@@ -25,7 +25,7 @@ _MAX_RECURSIVE_CALLS = 10
 encountering a network error before they stop and give up.'''
 
 _MAX_FAILURES = 3
-'''Maximum number of network failures before we give up.'''
+'''Maximum number of consecutive failures before pause and try another round.'''
 
 _MAX_RETRIES = 5
 '''Maximum number of times we back off and try again.  This also affects the
@@ -72,20 +72,20 @@ def timed_request(get_or_post, url, session = None, timeout = 20, **kwargs):
                 return response
         except Exception as ex:
             # Problem might be transient.  Don't quit right away.
-            if __debug__: log('exception: {}', str(ex))
             failures += 1
+            if __debug__: log('exception (failure #{}): {}', failures, str(ex))
             # Record the first error we get, not the subsequent ones, because
             # in the case of network outages, the subsequent ones will be
             # about being unable to reconnect and not the original problem.
             if not error:
                 error = ex
         if failures >= _MAX_FAILURES:
-            # Try pause & continue, in case of transient network issues.
+            # Pause with exponential back-off, reset failure count & try again.
             if retries < _MAX_RETRIES:
                 retries += 1
+                failures = 0
                 if __debug__: log('pausing because of consecutive failures')
                 sleep(10 * retries * retries)
-                failures = 0
             else:
                 # We've already paused & restarted once.
                 raise error
