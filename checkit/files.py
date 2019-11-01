@@ -48,8 +48,10 @@ def readable(dest):
 def writable(dest):
     '''Returns True if the destination is writable.'''
 
-    # Helper function.
+    # Helper function to test if a directory is writable.
     def dir_writable(dir):
+        # This is based on the following Stack Overflow answer by user "zak":
+        # https://stackoverflow.com/a/25868839/743730
         try:
             testfile = tempfile.TemporaryFile(dir = dir)
             testfile.close()

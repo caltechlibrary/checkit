@@ -49,10 +49,11 @@ OUTPUT_COLUMNS = OrderedDict([
     ('Holdings total', lambda flag, record, copies: len(copies))
 ])
 '''
-Ordered dictionary of the fields to write out in the CSV output file.
-The keys are the column titles, and the values are functions that are
-handed two arguments: the current record, and a dictionary of Holding items
-representing the copies of that item held in the Caltech Libraries.
+Ordered dictionary of the fields to write out in the CSV output file.  The
+keys are the column titles, and the values are functions that are handed
+three arguments: a flag (a text string to indicate something about the
+record/row being written), the current record, and a dictionary of Holding
+items representing the copies of that item held in the Caltech Libraries.
 '''
 
 
@@ -203,6 +204,10 @@ def row_for_missing(barcode):
 
 
 def confirmed_input_file(infile):
+    '''Checks file 'infile' to make sure it's readable and contains barcodes.
+    Asks the user for a file if 'infile' is None, or if the file is not
+    readable or doesn't contain barcodes.
+    '''
     while True:
         if not infile:
             inform('Asking user for input file ...')
@@ -230,6 +235,10 @@ def confirmed_input_file(infile):
 
 
 def confirmed_output_file(outfile, suffix = '.csv'):
+    '''Checks the file 'outfile' to make sure it can be written.  Asks the user
+    for a file if 'outfile' is None or is not writable.  Adds the suffix if
+    the final file name does not already end with that suffix.
+    '''
     while True:
         if not outfile:
             inform('Asking user for output file ...')
