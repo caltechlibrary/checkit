@@ -203,22 +203,29 @@ def row_for_missing(barcode):
 
 
 def confirmed_input_file(infile):
-    while not infile:
-        inform('Asking user for input file ...')
-        infile = file_selection('open', 'file of barcodes to read',
-                                'CSV file|*.csv|Any file|*.*')
-        # If the user cancels out of the GUI dialog or hits return in the
-        # CLI dialog, the return value will be None => quit.
-        if not infile and not yes_reply('No input file chosen – select another?'):
-            return None
+    while True:
+        if not infile:
+            inform('Asking user for input file ...')
+            infile = file_selection('open', 'file of barcodes to read',
+                                    'CSV file|*.csv|Any file|*.*')
+            if not infile:
+                if yes_reply('No input file chosen – select another?'):
+                    continue
+                else:
+                    return None
         if infile and not readable(infile):
-            alert('Cannot read file: {}', infile)
-            return None
+            if yes_reply('Cannot read file {} – select another?'.format(infile)):
+                infile = None
+                continue
+            else:
+                return None
         if infile and not file_contains_barcodes(infile):
             if yes_reply('File appears to lack barcodes – select another?'):
                 infile = None
+                continue
             else:
                 return None
+        break
     return infile
 
 
