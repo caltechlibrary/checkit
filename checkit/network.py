@@ -84,7 +84,7 @@ def timed_request(get_or_post, url, session = None, timeout = 20, **kwargs):
             if retries < _MAX_RETRIES:
                 retries += 1
                 if __debug__: log('pausing because of consecutive failures')
-                sleep(60 * retries)
+                sleep(10 * retries * retries)
                 failures = 0
             else:
                 # We've already paused & restarted once.
