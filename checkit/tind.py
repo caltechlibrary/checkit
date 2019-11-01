@@ -104,7 +104,7 @@ class Tind(object):
             else:
                 # This means we have a problem.
                 details = 'Caltech.tind.io returned an empty result for our query'
-                alert_fatal('Empty result from TIND', details)
+                alert_fatal('Empty result from TIND', details = details)
                 raise ServiceFailure(details)
         if __debug__: log('returning {} records', len(records_list))
         return records_list
@@ -219,22 +219,23 @@ class Tind(object):
         tree = html.fromstring(content)
         if tree is None or tree.xpath('//form[@action]') is None:
             details = 'Caltech Shib access result does not have expected form'
-            alert_fatal('Unexpected TIND result -- please inform developers', details)
+            alert_fatal('Unexpected server response -- please inform developers',
+                        details = details)
             raise ServiceFailure(details)
         next_url = tree.xpath('//form[@action]')[0].action
         SAMLResponse = tree.xpath('//input[@name="SAMLResponse"]')[0].value
         RelayState = tree.xpath('//input[@name="RelayState"]')[0].value
-        saml_payload = {'SAMLResponse': SAMLResponse, 'RelayState': RelayState}
+        payload = {'SAMLResponse': SAMLResponse, 'RelayState': RelayState}
         try:
             if __debug__: log('issuing network post to {}', next_url)
-            res = session.post(next_url, data = saml_payload)
+            (response, error) = net('post', next_url, session = session, data = payload)
         except Exception as err:
             details = 'exception connecting to TIND: {}'.format(err)
-            alert_fatal('Server problem -- try again later', details)
+            alert_fatal('Server problem -- try again later', details = details)
             raise ServiceFailure(details)
-        if res.status_code != 200:
-            details = 'TIND network post returned status {}'.format(res.status_code)
-            alert_fatal('Caltech.tind.io circulation page failed to respond', details)
+        if response.status_code != 200:
+            details = 'TIND network call returned code {}'.format(response.status_code)
+            alert_fatal('Problem accessing Caltech.tind.io', details = details)
             raise ServiceFailure(details)
         if __debug__: log('successfully created session with caltech.tind.io')
         return session
@@ -242,19 +243,13 @@ class Tind(object):
 
     def _tind_request(self, session, get_or_post, url, data, purpose):
         '''Issue the network request to TIND.'''
-        access = session.get if get_or_post == 'get' else session.post
-        try:
-            if __debug__: log('issuing network {} for {}', get_or_post, purpose)
-            req = access(url, data = data)
-        except Exception as err:
-            details = 'exception connecting to TIND: {}'.format(err)
-            alert_fatal('Unable to connect to TIND -- try later', details)
+        if __debug__: log('issuing network {} for {}', get_or_post, purpose)
+        (response, error) = net(get_or_post, url, session = session, data = data)
+        if error:
+            details = 'Shibboleth returned status {}'.format(response.status_code)
+            alert_fatal('Service failure -- please inform developers', details = details)
             raise ServiceFailure(details)
-        if req.status_code >= 300:
-            details = 'Shibboleth returned status {}'.format(req.status_code)
-            alert_fatal('Service failure -- please inform developers', details)
-            raise ServiceFailure(details)
-        return req.content
+        return response.content
 
 
     def _tind_json(self, session, barcode_list):
@@ -324,15 +319,15 @@ class Tind(object):
                         "Content-Type"     : "application/json",
                         'User-Agent'       : _USER_AGENT_STRING}
         if __debug__: log('posting ajax call to tind.io')
-        (resp, error) = net('post', ajax_url, session = session,
-                            headers = ajax_headers, json = payload)
+        (response, error) = net('post', ajax_url, session = session,
+                                headers = ajax_headers, json = payload)
         if isinstance(error, NoContent):
             if __debug__: log('server returned a "no content" code')
             return []
         elif error:
             raise error
         if __debug__: log('decoding results as json')
-        results = resp.json()
+        results = response.json()
         if 'recordsTotal' not in results or 'data' not in results:
             alert_fatal('Unexpected result from TIND AJAX call')
             raise InternalError('Unexpected result from TIND AJAX call')
@@ -353,14 +348,14 @@ class Tind(object):
         url = 'https://caltech.tind.io/record/{}/holdings'.format(tind_id)
         holdings = []
         inform('Getting holdings info from TIND for {} ...'.format(tind_id))
-        (resp, error) = net('get', url, session = session)
+        (response, error) = net('get', url, session = session)
         if isinstance(error, NoContent):
             if __debug__: log('server returned a "no content" code')
             return []
         elif error:
             raise error
         if __debug__: log('scraping web page for holdings of {}', tind_id)
-        content = str(resp.content)
+        content = str(response.content)
         if not content or content.find('This record has no copies.') >= 0:
             warn('Unexpectedly empty holdings page for TIND id {}', tind_id)
             return []
