@@ -86,3 +86,4 @@ ABOUT.md
 build
 dist
 checkit/data/help.html
+dev/installers/windows/checkit_innosetup_script.iss
