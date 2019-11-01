@@ -125,7 +125,7 @@ def warn(text, *args):
     alert(...) method instead.)
     '''
     ui = UI.instance()
-    ui.warn(text *args)
+    ui.warn(text, *args)
 
 
 def alert(text, *args):
