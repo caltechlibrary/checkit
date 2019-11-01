@@ -28,7 +28,7 @@ from .files import readable, writable, file_in_use, rename_existing
 from .network import network_available
 from .record import ItemRecord
 from .tind import Tind
-from .ui import inform, warn, alert, alert_fatal, file_selection
+from .ui import inform, warn, alert, alert_fatal, file_selection, yes_reply
 
 
 # Global constants.
@@ -84,6 +84,7 @@ class MainBody(Thread):
         if __debug__: log('starting')
         try:
             self._do_main_work()
+            inform('Done.')
         except (KeyboardInterrupt, UserCancelled) as ex:
             if __debug__: log('got {} exception', type(ex).__name__)
             inform('User cancelled operation -- stopping.')
@@ -117,17 +118,8 @@ class MainBody(Thread):
 
         # Read the input file -------------------------------------------------
 
+        infile = confirmed_input_file(infile)
         if not infile:
-            inform('Asking user for input file ...')
-            infile = file_selection('open', 'file of barcodes', 'CSV file|*.csv|Any file|*.*')
-        if not infile:
-            alert('No input file')
-            return
-        if not readable(infile):
-            alert('Cannot read file: {}', infile)
-            return
-        if not file_contains_barcodes(infile):
-            alert('File does not appear to contain barcodes: {}', infile)
             return
 
         barcode_list = []
@@ -159,24 +151,13 @@ class MainBody(Thread):
 
         # Write the output ----------------------------------------------------
 
+        outfile = confirmed_output_file(outfile)
         if not outfile:
-            inform('Asking user for output file ...')
-            outfile = file_selection('save', 'output file')
-        if not outfile:
-            alert('No output file specified')
             return
-        if path.exists(outfile):
-            rename_existing(outfile)
-        if file_in_use(outfile):
-            details = '{} appears to be open in another program'.format(outfile)
-            alert('Cannot write output file: {}', details)
-            return
-        if path.exists(outfile) and not writable(outfile):
-            alert('You may not have write permissions to {}', outfile)
-            return
-
         if not outfile.endswith('.csv'):
             outfile += '.csv'
+        if path.exists(outfile):
+            rename_existing(outfile)
 
         inform('Writing file {} ...', outfile)
         with open(outfile, 'w') as f:
@@ -196,7 +177,7 @@ class MainBody(Thread):
                     other.item_copy_number = held.copy
                     other.item_status = held.status
                     sheet.writerow(row_for_record('added', other, copies))
-        inform('Finished writing output.')
+        inform('Finished writing {}', outfile)
 
 
 # Miscellaneous utility functions
@@ -225,3 +206,46 @@ def row_for_record(flag, record, copies):
 def row_for_missing(barcode):
     '''Returns a list with the barcode and 'n/a' for all the columns.'''
     return ['original', barcode] + ['n/a']*(len(OUTPUT_COLUMNS) - 1)
+
+
+def confirmed_input_file(infile):
+    while not infile:
+        inform('Asking user for input file ...')
+        infile = file_selection('open', 'file of barcodes to read',
+                                'CSV file|*.csv|Any file|*.*')
+        # If the user cancels out of the GUI dialog or hits return in the
+        # CLI dialog, the return value will be None => quit.
+        if not infile and not yes_reply('No input file chosen – select another?'):
+            return None
+        if infile and not readable(infile):
+            alert('Cannot read file: {}', infile)
+            return None
+        if infile and not file_contains_barcodes(infile):
+            if yes_reply('File appears to lack barcodes – select another?'):
+                infile = None
+            else:
+                return None
+    return infile
+
+
+def confirmed_output_file(outfile):
+    while not outfile:
+        inform('Asking user for output file ...')
+        outfile = file_selection('save', 'output file')
+        if not outfile and not yes_reply('No output file chosen – select another?'):
+            return None
+        if outfile and file_in_use(outfile):
+            if yes_reply('File appears to be open by another program – select another?'):
+                outfile = None
+            elif not yes_reply('OK to quit without saving results?'):
+                outfile = None
+            else:
+                return None
+        if outfile and path.exists(outfile) and not writable(outfile):
+            if yes_reply('Cannot write file {} – select another?'.format(outfile)):
+                outfile = None
+            elif not yes_reply('OK to quit without saving results?'):
+                outfile = None
+            else:
+                return None
+    return outfile
