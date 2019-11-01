@@ -74,7 +74,7 @@ import webbrowser
 from .app_frame import AppFrame
 from .debug import log
 from .exceptions import *
-from .files import datadir_path, readable
+from .files import readable
 from .logo import getLogoIcon
 from .styled import Styled
 
