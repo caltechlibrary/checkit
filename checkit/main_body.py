@@ -106,10 +106,6 @@ class MainBody(Thread):
     def _do_main_work(self):
         '''Performs the core work of this program.'''
 
-        # Set shortcut variables for better code readability below.
-        infile  = self._infile
-        outfile = self._outfile
-
         # Do basic sanity checks ----------------------------------------------
 
         inform('Doing initial checks ...')
@@ -118,7 +114,7 @@ class MainBody(Thread):
 
         # Read the input file -------------------------------------------------
 
-        infile = confirmed_input_file(infile)
+        infile = confirmed_input_file(self._infile)
         if not infile:
             return
 
@@ -151,15 +147,13 @@ class MainBody(Thread):
 
         # Write the output ----------------------------------------------------
 
-        outfile = confirmed_output_file(outfile)
-        if not outfile:
-            return
-        if not outfile.endswith('.csv'):
-            outfile += '.csv'
-        if path.exists(outfile):
-            rename_existing(outfile)
+        outfile = confirmed_output_file(self._outfile, '.csv')
+        while not outfile:
+             if yes_reply('OK to quit without saving results?'):
+                 return
+             else:
+                 outfile = confirmed_output_file(outfile, '.csv')
 
-        inform('Writing file {} ...', outfile)
         with open(outfile, 'w') as f:
             sheet = csv.writer(f, delimiter = ',')
             sheet.writerow(OUTPUT_COLUMNS.keys())
@@ -177,7 +171,7 @@ class MainBody(Thread):
                     other.item_copy_number = held.copy
                     other.item_status = held.status
                     sheet.writerow(row_for_record('added', other, copies))
-        inform('Finished writing {}', outfile)
+        inform('Finished writing output to {}', outfile)
 
 
 # Miscellaneous utility functions
@@ -228,24 +222,27 @@ def confirmed_input_file(infile):
     return infile
 
 
-def confirmed_output_file(outfile):
-    while not outfile:
-        inform('Asking user for output file ...')
-        outfile = file_selection('save', 'output file')
-        if not outfile and not yes_reply('No output file chosen – select another?'):
-            return None
-        if outfile and file_in_use(outfile):
-            if yes_reply('File appears to be open by another program – select another?'):
-                outfile = None
-            elif not yes_reply('OK to quit without saving results?'):
-                outfile = None
-            else:
-                return None
-        if outfile and path.exists(outfile) and not writable(outfile):
+def confirmed_output_file(outfile, suffix = '.csv'):
+    while True:
+        if not outfile:
+            inform('Asking user for output file ...')
+            outfile = file_selection('save', 'output file')
+            if not outfile:
+                if yes_reply('No output file chosen – select another?'):
+                    continue
+                else:
+                    return None
+        if outfile and not outfile.endswith(suffix):
+            inform('Adding {} suffix to file name {}', suffix, outfile)
+            outfile += suffix
+        if outfile and not writable(outfile):
             if yes_reply('Cannot write file {} – select another?'.format(outfile)):
                 outfile = None
-            elif not yes_reply('OK to quit without saving results?'):
-                outfile = None
+                continue
             else:
                 return None
+        break
+    if path.exists(outfile):
+        inform('Renaming existing file {} to backup name', outfile)
+        rename_existing(outfile)
     return outfile
