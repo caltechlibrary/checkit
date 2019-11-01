@@ -82,15 +82,8 @@ class Tind(object):
 
 
     def records(self, barcode_list):
-        records_list = []
-        to_get = []
-        for barcode in barcode_list:
-            # Check the cache in case already have records from a previous call.
-            if barcode in self._cache:
-                if __debug__: log('reusing existing object for {}', barcode)
-                records_list.append(self._cache[barcode])
-            else:
-                to_get.append(barcode)
+        results = [self._cache[b] for b in barcode_list if b in self._cache]
+        to_get  = [b for b in barcode_list if b not in self._cache]
         if to_get:
             if __debug__: log('will ask tind about {} barcodes', len(to_get))
             json_data = self._tind_json(self._session, to_get)
@@ -100,39 +93,32 @@ class Tind(object):
                     record = self.filled_record(json_record)
                     if __debug__: log('caching ItemRecord for {}', record.item_barcode)
                     self._cache[record.item_barcode] = record
-                    records_list.append(record)
+                    results.append(record)
             else:
                 # This means we have a problem.
                 details = 'Caltech.tind.io returned an empty result for our query'
                 alert_fatal('Empty result from TIND', details = details)
                 raise ServiceFailure(details)
-        if __debug__: log('returning {} records', len(records_list))
-        return records_list
+        if __debug__: log('returning {} records', len(results))
+        return results
 
 
-    def holdings(self, tind_id_list):
+    def holdings(self, id_list):
         '''Takes a list of TIND id's, and returns a dictionary where the keys
         are TIND id's and the values are lists of Holding tuples.  The list
         thereby describes the status (on shelf, lost, etc.) and location of
         each copy of the item identified by that TIND item record.
         '''
-        holdings_dict = {}
-        to_get = []
-        for id in tind_id_list:
-            # Check the cache in case already have holdings from a previous call.
-            if id in self._holdings:
-                if __debug__: log('returning stored holdings for {}', id)
-                holdings_dict[id] = self._holdings[id]
-            else:
-                to_get.append(id)
+        results_dict = {id: self._holdings[id] for id in id_list if id in self._holdings}
+        to_get = [id for id in id_list if id not in self._holdings]
         if to_get:
             if __debug__: log('will ask tind about {} holdings', len(to_get))
-            for tind_id in [id for id in to_get if id not in holdings_dict]:
-                holdings_dict[tind_id] = self._tind_holdings(self._session, tind_id)
+            for tind_id in to_get:
+                results_dict[tind_id] = self._tind_holdings(self._session, tind_id)
                 if __debug__: log('caching holdings for {}', tind_id)
-                self._holdings[tind_id] = holdings_dict[tind_id]
-        if __debug__: log('returning {} records', len(holdings_dict))
-        return holdings_dict
+                self._holdings[tind_id] = results_dict[tind_id]
+        if __debug__: log('returning {} records', len(results_dict))
+        return results_dict
 
 
     def filled_record(self, json_dict):
