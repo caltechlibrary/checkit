@@ -23,18 +23,17 @@ import sys
 import tempfile
 import webbrowser
 
-import checkit
-from checkit.debug import log
+from .debug import log
 
 
 # Constants.
 # .............................................................................
 
-_APP_NAME = __package__
-'''The human name of this application for human consumption.'''
-
-_APP_REG_PATH = r'Software\Caltech Library\{}\Settings'.format(_APP_NAME)
-'''The Windows registry path for this application.'''
+_APP_REG_PATH_FORMAT = r'Software\Caltech Library\{}\Settings'
+'''Format of the the Windows registry path for this application.  Contains one
+string format substitution placeholder.  Use this with a call to format(...)
+like this: _APP_REG_PATH_FORMAT.format(module).
+'''
 
 
 # Main functions.
@@ -70,16 +69,18 @@ def writable(dest):
         return dir_writable(path.dirname(dest))
 
 
-def module_path():
-    '''Returns the absolute path to our module installation directory.'''
-    # The path returned by module.__path__ is to the directory containing
-    # the __init__.py file.
-    this_module = sys.modules[__package__]
-    return path.abspath(this_module.__path__[0])
+def module_path(module_name = __package__):
+    '''Returns the absolute path to the installation directory of the Python
+    module named 'name'.  The name defaults to __package__.
+    '''
+    if module_name in sys.modules:
+        return path.abspath(sys.modules[module_name].__path__[0])
+    else:
+        return None
 
 
-def installation_path():
-    '''Returns the path to where the application is installed.'''
+def installation_path(module_name = __package__):
+    '''Returns the path to where the given Python package is installed.'''
     # The path returned by module.__path__ is to the directory containing
     # the __init__.py file.  What we want here is the path to the installation
     # of the application binary.
@@ -87,16 +88,19 @@ def installation_path():
         from winreg import OpenKey, CloseKey, QueryValueEx, HKEY_LOCAL_MACHINE, KEY_READ
         try:
             if __debug__: log('reading Windows registry entry')
-            key = OpenKey(HKEY_LOCAL_MACHINE, _APP_REG_PATH)
+            reg_path = _APP_REG_PATH_FORMAT.format(module_name)
+            key = OpenKey(HKEY_LOCAL_MACHINE, reg_path)
             value, regtype = QueryValueEx(key, 'Path')
             CloseKey(key)
             if __debug__: log('path to windows installation: {}'.format(value))
             return value
         except WindowsError:
             # Kind of a problem. Punt and return a default value.
-            return path.abspath('C:\Program Files\{}'.format(_APP_NAME))
+            default_path = path.abspath('C:\Program Files\{}'.format(module_name))
+            if __debug__: log('defaulting to {}', default_path)
+            return default_path
     else:
-        return path.abspath(path.join(module_path(), '..'))
+        return path.abspath(path.join(module_path(module_name), '..'))
 
 
 def desktop_path():
@@ -107,9 +111,9 @@ def desktop_path():
         return path.join(path.expanduser('~'), 'Desktop')
 
 
-def datadir_path():
-    '''Returns the path to Lost It's internal data directory.'''
-    return path.join(module_path(), 'data')
+def datadir_path(module_name = __package__):
+    '''Returns the path to the named module's internal data directory.'''
+    return path.join(module_path(module_name), 'data')
 
 
 def files_in_directory(dir, extensions = None):
