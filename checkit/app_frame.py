@@ -207,7 +207,7 @@ class AppFrame(wx.Frame):
 
     def open_file(self, return_queue, message, pattern = '*.*'):
         if __debug__: log('creating and showing open file dialog')
-        fd = wx.FileDialog(self, message, defaultDir = os.getcwd(),
+        fd = wx.FileDialog(self, 'Open ' + message, defaultDir = os.getcwd(),
                            wildcard = pattern,
                            style = wx.FD_OPEN | wx.FD_FILE_MUST_EXIST)
         cancelled = (fd.ShowModal() == wx.ID_CANCEL)
@@ -221,7 +221,7 @@ class AppFrame(wx.Frame):
 
     def save_file(self, return_queue, message):
         if __debug__: log('creating and showing save file dialog')
-        fd = wx.FileDialog(self, message, defaultDir = os.getcwd(),
+        fd = wx.FileDialog(self, 'Save ' + message, defaultDir = os.getcwd(),
                            style = wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT)
         cancelled = (fd.ShowModal() == wx.ID_CANCEL)
         file_path = None if cancelled else fd.GetPath()
