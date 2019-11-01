@@ -38,15 +38,12 @@ maximum wait time that will be reached after repeated retries.'''
 
 def network_available():
     '''Return True if it appears we have a network connection, False if not.'''
-    r = None
     try:
-        r = urllib.request.urlopen("http://www.google.com")
+        urllib.request.urlopen("http://www.google.com").close()
         return True
     except Exception:
         if __debug__: log('could not connect to https://www.google.com')
         return False
-    if r:
-        r.close()
 
 
 def timed_request(get_or_post, url, session = None, timeout = 20, **kwargs):
