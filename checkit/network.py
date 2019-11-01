@@ -161,9 +161,9 @@ def net(get_or_post, url, session = None, polling = False, recursing = 0, **kwar
     # and 302 redirects automatically, so we don't need to do it here.
     code = req.status_code
     error = None
-    if __debug__: log(addurl('server returned http code {}'.format(code)))
+    if __debug__: log(addurl('got http status code {}'.format(code)))
     if code == 400:
-        error = RequestError('Server rejected the request')
+        error = RequestError(addurl('Server rejected the request'))
     elif code in [401, 402, 403, 407, 451, 511]:
         error = AuthFailure(addurl('Access is forbidden'))
     elif code in [404, 410] and not polling:
@@ -183,7 +183,7 @@ def net(get_or_post, url, session = None, polling = False, recursing = 0, **kwar
     elif code == 503:
         error = ServiceFailure('Server is unavailable -- try again later')
     elif code in [500, 501, 502, 506, 507, 508]:
-        error = ServiceFailure('Server error (HTTP code {})'.format(code))
+        error = ServiceFailure(addurl('Server error (HTTP code {})'.format(code)))
     elif not (200 <= code < 400):
         error = NetworkFailure("Unable to resolve {}".format(url))
     if __debug__: log('returning result {}',
