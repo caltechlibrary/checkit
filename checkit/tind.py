@@ -27,7 +27,7 @@ from .debug import log
 from .exceptions import *
 from .network import net
 from .record import ItemRecord
-from .ui import inform, warn, alert, alert_fatal, yes_reply
+from .ui import inform, warn, alert, alert_fatal, confirm
 
 
 # Helper data types.
@@ -192,7 +192,7 @@ class Tind(object):
             # Did we succeed?
             logged_in = bool(str(content).find('Forgot your password') <= 0)
             if not logged_in:
-                if yes_reply('Incorrect login. Try again?'):
+                if confirm('Incorrect login. Try again?'):
                     # Don't supply same values to the dialog if they were wrong.
                     user = pswd = None
                 else:

@@ -1,5 +1,4 @@
-'''
-ui.py: user interface
+'''ui.py: user interface
 
 Explanation of the architecture
 -------------------------------
@@ -42,30 +41,6 @@ The approach taken here has two main features.
   wx.CallAfter places the execution into the thread that's running
   MainLoop(), thus solving the problem.
 
-Notes about coding conventions
-------------------------------
-
-The naming convention followed for the method names is the same as elsewhere
-in this and similar application I've written:
-
- - if it's a verb: an action that doesn't return a value. E.g., "start".
- - if it's a noun: the value returned by an action.  E.g., "file_from_dialog".
-
-This style is geared towards making the calling code more readable.  For
-example, asking the user a question is often done in the context of an if-then
-condition, so writing it as "if yes_reply(question): do something ..."  reads
-more naturally as a sentence than something like "if dialog(question)...",
-because the former naturally implies a value is being returned whereas
-"dialog" doesn't imply a value at all.  This is the reason methods have names
-such as "file_selection" (meant to be read as a noun, i.e., it is the file provided
-in response to a question of the user) rather than "select_file" (which reads
-as an action, i.e., "select a file", and leaves open to interpretation what,
-if anything, it returns to the caller).
-
-More succinctly: if the name is a verb, then the method performs an action
-without returning a value, whereas if the name is a noun, the name describes
-the value returned.
-
 Authors
 -------
 
@@ -77,6 +52,7 @@ Copyright
 Copyright (c) 2019 by the California Institute of Technology.  This code is
 open-source software released under a 3-clause BSD license.  Please see the
 file "LICENSE" for more information.
+
 '''
 
 import getpass
@@ -170,10 +146,10 @@ def login_details(prompt, user, password):
     return ui.login_details(prompt, user, password)
 
 
-def yes_reply(question):
+def confirm(question):
     '''Returns True if the user replies 'yes' to the 'question'.'''
     ui = UI.instance()
-    return ui.yes_reply(question)
+    return ui.confirm(question)
 
 
 # Base class for UI implementations
@@ -231,7 +207,7 @@ class UIBase:
 
     def file_selection(self, type, purpose, pattern): raise NotImplementedError
     def login_details(self, prompt, user, pswd):      raise NotImplementedError
-    def yes_reply(self, question):                    raise NotImplementedError
+    def confirm(self, question):                      raise NotImplementedError
 
 
 # Exported classes.
@@ -310,7 +286,7 @@ class CLI(UIBase, Styled):
         print(self.fatal_text(text, *args), flush = True)
 
 
-    def yes_reply(self, question):
+    def confirm(self, question):
         '''Asks a yes/no question of the user, on the command line.'''
         return input("{} (y/n) ".format(question)).startswith(('y', 'Y'))
 
@@ -372,7 +348,7 @@ class GUI(UIBase):
         wx.CallAfter(self._frame.Destroy)
 
 
-    def yes_reply(self, question):
+    def confirm(self, question):
         '''Asks the user a yes/no question using a GUI dialog.'''
         if __debug__: log('generating yes/no dialog')
         wx.CallAfter(self._ask_yes_no, question)

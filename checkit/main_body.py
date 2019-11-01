@@ -28,7 +28,7 @@ from .files import readable, writable, file_in_use, rename_existing
 from .network import network_available
 from .record import ItemRecord
 from .tind import Tind
-from .ui import inform, warn, alert, alert_fatal, file_selection, yes_reply
+from .ui import inform, warn, alert, alert_fatal, file_selection, confirm
 
 
 # Global constants.
@@ -149,7 +149,7 @@ class MainBody(Thread):
 
         outfile = confirmed_output_file(self._outfile, '.csv')
         while not outfile:
-             if yes_reply('OK to quit without saving results?'):
+             if confirm('OK to quit without saving results?'):
                  return
              else:
                  outfile = confirmed_output_file(outfile, '.csv')
@@ -209,18 +209,18 @@ def confirmed_input_file(infile):
             infile = file_selection('open', 'file of barcodes to read',
                                     'CSV file|*.csv|Any file|*.*')
             if not infile:
-                if yes_reply('No input file chosen – select another?'):
+                if confirm('No input file chosen – select another?'):
                     continue
                 else:
                     return None
         if infile and not readable(infile):
-            if yes_reply('Cannot read file {} – select another?'.format(infile)):
+            if confirm('Cannot read file {} – select another?'.format(infile)):
                 infile = None
                 continue
             else:
                 return None
         if infile and not file_contains_barcodes(infile):
-            if yes_reply('File appears to lack barcodes – select another?'):
+            if confirm('File appears to lack barcodes – select another?'):
                 infile = None
                 continue
             else:
@@ -235,7 +235,7 @@ def confirmed_output_file(outfile, suffix = '.csv'):
             inform('Asking user for output file ...')
             outfile = file_selection('save', 'output file')
             if not outfile:
-                if yes_reply('No output file chosen – select another?'):
+                if confirm('No output file chosen – select another?'):
                     continue
                 else:
                     return None
@@ -243,7 +243,7 @@ def confirmed_output_file(outfile, suffix = '.csv'):
             inform('Adding {} suffix to file name {}', suffix, outfile)
             outfile += suffix
         if outfile and not writable(outfile):
-            if yes_reply('Cannot write file {} – select another?'.format(outfile)):
+            if confirm('Cannot write file {} – select another?'.format(outfile)):
                 outfile = None
                 continue
             else:
