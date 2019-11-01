@@ -76,14 +76,14 @@ Once it has login credentials, Check It! gets to work contacting Caltech.tind.io
 When it is done, it will present the user with one more file dialog, this time to create a destination output file where the results will be written.  The format of the output is a CSV file with various fields such as the status of the item, the location, etc.  As an example, here is the output for the three barcodes listed above:
 
 ```
-Barcode,Status,Call number,Copy number,Location code,Location name,TIND id,Item type,Holdings total
-35047019298421,on shelf,QH313 .S962 2009,c.1,sfm2,SFL 2 books,697884,Book,2
-35047018911974,on loan,QH313 .S962 2009,c.2,sfm2,SFL 2 books,697884,Book,2
-35047016806341,on shelf,QH313 .F66 2001,c.1,sfm2,SFL 2 books,652039,Book,1
-35047013986138,on shelf,QA402.3 .Z48 1996,c.1,sfm,SFL basement books,613338,Book,2
+Flag,Barcode,Status,Call number,Copy number,Location code,Location name,TIND id,Item type,Holdings total
+original,35047019298421,on shelf,QH313 .S962 2009,c.1,sfm2,SFL 2 books,697884,Book,2
+added,35047018911974,on loan,QH313 .S962 2009,c.2,sfm2,SFL 2 books,697884,Book,2
+original,35047016806341,on shelf,QH313 .F66 2001,c.1,sfm2,SFL 2 books,652039,Book,1
+original,35047013986138,on shelf,QA402.3 .Z48 1996,c.1,sfm,SFL basement books,613338,Book,2
 ```
 
-Note that the output has more lines than the input.  One of the purposes of Check It! is to identify items that should be on the shelf, but are not.  It therefore checks all the holdings recorded for a given item in Caltech.tind.io, and if any of them are marked with a status other than "on shelf", it adds rows to the output under the related item.  Thus, in the output above, the 2nd item with a status of "on loan" is something added by Check It!.
+Note that the output has more lines than the input.  One of the purposes of Check It! is to identify items that should be on the shelf, but are not.  It therefore checks all the holdings recorded for a given item in Caltech.tind.io, and if any of them are marked with a status other than "on shelf", it adds rows to the output under the related item.  These are noted with the word "added" in the first column.  Thus, in the output above, the 2nd item with a status of "on loan" is something added by Check It!.
 
 
 ### The command-line interface
