@@ -191,7 +191,7 @@ class AppFrame(wx.Frame):
     def on_help(self, event):
         if __debug__: log('opening Help window')
         wx.BeginBusyCursor()
-        help_file = path.join(datadir_path(), "help.html")
+        help_file = path.join(datadir_path(__package__), "help.html")
         if readable(help_file):
             webbrowser.open_new("file://" + help_file)
         wx.EndBusyCursor()
