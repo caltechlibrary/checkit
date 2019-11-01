@@ -100,9 +100,9 @@ def installation_path():
 def desktop_path():
     '''Returns the path to the user's desktop directory.'''
     if sys.platform.startswith('win'):
-        return path.join(path.join(os.environ['USERPROFILE']), 'Desktop')
+        return path.join(os.environ['USERPROFILE'], 'Desktop')
     else:
-        return path.join(path.join(path.expanduser('~')), 'Desktop')
+        return path.join(path.expanduser('~'), 'Desktop')
 
 
 def datadir_path():
