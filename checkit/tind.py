@@ -117,7 +117,7 @@ class Tind(object):
                 results_dict[tind_id] = self._tind_holdings(self._session, tind_id)
                 if __debug__: log('caching holdings for {}', tind_id)
                 self._holdings[tind_id] = results_dict[tind_id]
-        if __debug__: log('returning {} records', len(results_dict))
+        if __debug__: log('returning {} holdings', len(results_dict))
         return results_dict
 
 
@@ -347,6 +347,7 @@ class Tind(object):
             return []
         soup = BeautifulSoup(content, features='lxml')
         tables = soup.body.find_all('table')
+        if __debug__: log('parsing holdings table for {}', tind_id)
         if len(tables) >= 2:
             rows = tables[1].find_all('tr')
             for row in rows[1:]:        # Skip the heading row.
