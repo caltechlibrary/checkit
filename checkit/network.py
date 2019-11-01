@@ -13,9 +13,8 @@ from   urllib import request
 import urllib3
 import warnings
 
-import checkit
-from   checkit.debug import log
-from   checkit.exceptions import *
+from   .debug import log
+from   .exceptions import *
 
 
 # Constants.
