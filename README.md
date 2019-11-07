@@ -165,7 +165,7 @@ Authors and history
 Acknowledgments
 ---------------
 
-The [vector artwork]() used as a starting point for the logo for this repository was created by [Ravindra Kalkani](https://thenounproject.com/ravindrakalkani/) for the [Noun Project](https://thenounproject.com).  It is licensed under the Creative Commons [Attribution 3.0 Unported](https://creativecommons.org/licenses/by/3.0/deed.en) license.  The vector graphics was modified by Mike Hucka to change the color.
+The [vector artwork](https://thenounproject.com/ravindrakalkani/uploads/?i=2096134) used as a starting point for the logo for this repository was created by [Ravindra Kalkani](https://thenounproject.com/ravindrakalkani/) for the [Noun Project](https://thenounproject.com).  It is licensed under the Creative Commons [Attribution 3.0 Unported](https://creativecommons.org/licenses/by/3.0/deed.en) license.  The vector graphics was modified by Mike Hucka to change the color.
 
 Check It! makes use of numerous open-source packages, without which it would have been effectively impossible to develop Check It! with the resources we had.  I want to acknowledge this debt.  In alphabetical order, the packages are:
 
@@ -173,7 +173,6 @@ Check It! makes use of numerous open-source packages, without which it would hav
 * [colorful](https://github.com/timofurrer/colorful) &ndash; terminal/text string styling
 * [distro](https://github.com/nir0s/distro)  &ndash; access information about an installed package
 * [ipdb](https://github.com/gotcha/ipdb) &ndash; the IPython debugger
-* [iteration_utilities](https://github.com/MSeifert04/iteration_utilities)  &ndash; utilities based on Python iterators and generators
 * [keyring](https://github.com/jaraco/keyring) &ndash; a library to access the system keyring service from Python
 * [lxml](https://lxml.de) &ndash; an XML parsing library for Python
 * [nameparser](https://github.com/derek73/python-nameparser) &ndash; simple Python module for parsing human names into their individual components
