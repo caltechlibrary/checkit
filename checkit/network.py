@@ -1,5 +1,17 @@
 '''
-network.py: miscellaneous network utilities for Handprint.
+network.py: miscellaneous network utilities.
+
+Authors
+-------
+
+Michael Hucka <mhucka@caltech.edu> -- Caltech Library
+
+Copyright
+---------
+
+Copyright (c) 2019 by the California Institute of Technology.  This code is
+open-source software released under a 3-clause BSD license.  Please see the
+file "LICENSE" for more information.
 '''
 
 import http.client
@@ -7,9 +19,8 @@ from   http.client import responses as http_responses
 import requests
 from   requests.packages.urllib3.exceptions import InsecureRequestWarning
 from   time import sleep
+import socket
 import ssl
-import urllib
-from   urllib import request
 import urllib3
 import warnings
 
@@ -35,10 +46,19 @@ maximum wait time that will be reached after repeated retries.'''
 # Main functions.
 # .............................................................................
 
-def network_available():
-    '''Return True if it appears we have a network connection, False if not.'''
+def network_available(address = "8.8.8.8", port = 53, timeout = 5):
+    '''Return True if it appears we have a network connection, False if not.
+    By default, this attempts to contact one of the Google DNS servers (as a
+    plain TCP connection, not as an actual DNS lookup).  Argument 'address'
+    and 'port' can be used to test a different server address and port.  The
+    socket connection is attempted for 'timeout' seconds.
+    '''
+    # Portions of this code are based on the answer by user "7h3rAm" posted to
+    # Stack Overflow here: https://stackoverflow.com/a/33117579/743730
     try:
-        urllib.request.urlopen("http://www.google.com").close()
+        if __debug__: log('testing if we have a network connection')
+        socket.setdefaulttimeout(timeout)
+        socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((address, port))
         return True
     except Exception:
         if __debug__: log('could not connect to https://www.google.com')
